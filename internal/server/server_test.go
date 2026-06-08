@@ -51,3 +51,32 @@ func TestReadyz(t *testing.T) {
 		t.Errorf("GET /readyz body = %q, want %q", got, "ok")
 	}
 }
+
+// TestHealthzNotGated guards that liveness works pre-auth: kubelet probes carry
+// no forward-auth header, so /healthz must answer 200 without one.
+func TestHealthzNotGated(t *testing.T) {
+	h := New(testConfig())
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("GET /healthz (no auth header) status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+// TestAPIGated guards that /api/* is behind the forward-auth middleware: a
+// request without the trusted header is rejected with 403 before reaching any
+// handler.
+func TestAPIGated(t *testing.T) {
+	h := New(testConfig())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("GET /api/runs (no auth header) status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
