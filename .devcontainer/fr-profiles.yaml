@@ -1,0 +1,6 @@
+profiles:
+  dev:
+    purpose: 'build/test runs-fr gateway: go build/test/vet, golangci-lint, esbuild
+      frontend, helm lint/template'
+    secrets: []
+default: dev
