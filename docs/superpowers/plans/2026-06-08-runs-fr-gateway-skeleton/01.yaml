@@ -1,0 +1,89 @@
+schema_version: 2
+phase:
+  number: 1
+  title: Bootstrap & config
+  tag: agentic
+  depends_on: []
+  tracking_issue: null
+tasks:
+- number: 1
+  title: Repo & toolchain scaffold
+  steps:
+  - id: P1.T1.S1
+    text: |
+      Scaffold the dev devcontainer profile (NO secrets — host handles gh): `fr init scaffold --profile dev --default --purpose "build/test runs-fr gateway: go build/test/vet, golangci-lint, esbuild frontend, helm lint/template" --tool go --tool node`. Verify `.devcontainer/dev/devcontainer.json` and `.devcontainer/fr-profiles.yaml` exist and `fr-profiles.yaml` lists profile `dev` with empty `secrets:`. Expected: files present, `dev` is default.
+  - id: P1.T1.S2
+    text: |
+      `go mod init github.com/derio-net/runs-fr`; set `go 1.23` in go.mod. Create dirs `cmd/runs-fr/`, `internal/config/`, `internal/server/`, `internal/kube/`, `internal/runs/`, `internal/term/`, `web/`, `charts/`. Expected: `go mod` ok, tree created.
+  - id: P1.T1.S3
+    text: |
+      Add `.gitignore` (`/bin/`, `web/node_modules/`, `web/dist/`, `cmd/runs-fr/static/bundle.*`) and a `Makefile` with `build`, `test`, `lint`, `frontend` targets. Expected: `make` parses; `make build` will work after later steps.
+- number: 2
+  title: Config loader (TDD)
+  steps:
+  - id: P1.T2.S1
+    text: |
+      RED — write `internal/config/config_test.go`: table test for `Load()` reading env ADDR (default ":8080"), NAMESPACE (required → error when empty), LABEL_SELECTOR (default "fr.run/id"), AUTH_HEADER (default "X-Forwarded-User"), KUBECONFIG (optional, "" ok). Run `fr isolation exec -- go test ./internal/config/` → FAILS to compile/red.
+  - id: P1.T2.S2
+    text: |
+      GREEN — implement `internal/config/config.go` `Config` struct + `Load() (*Config, error)` using os.Getenv with defaults and the NAMESPACE required-check. Run the test → PASS.
+- number: 3
+  title: HTTP server + healthz (TDD)
+  steps:
+  - id: P1.T3.S1
+    text: |
+      RED — `internal/server/server_test.go`: `New(cfg)` returns an http.Handler; `GET /healthz` (liveness) → 200 body "ok"; `GET /readyz` (readiness) → 200 in Phase 1 (enhanced in Phase 2 to check API reachability). Both via httptest. Run test → red.
+  - id: P1.T3.S2
+    text: |
+      GREEN — `internal/server/server.go` (`New(cfg) http.Handler` with a mux + `/healthz` liveness + `/readyz` readiness, and a `log/slog` logger constructed in `New`) and `cmd/runs-fr/main.go` (config.Load → server.New → `http.Server{}` with **graceful shutdown**: `Shutdown(ctx)` on SIGTERM/SIGINT via `signal.NotifyContext` — NOT bare `ListenAndServe`, so rollouts drain in-flight attaches). `fr isolation exec -- go build ./...` and test → PASS.
+- number: 4
+  title: CI skeleton
+  steps:
+  - id: P1.T4.S1
+    text: |
+      Add `.github/workflows/ci.yml`: on push/PR → actions/setup-go (1.23), `go vet ./...`, `go test ./... -race`, golangci/golangci-lint-action. Add minimal `.golangci.yml`. Expected: workflow valid YAML.
+  - id: P1.T4.S2
+    text: |
+      Verify locally via `fr isolation exec -- sh -c 'go vet ./... && go test ./...'` → all pass. Tick phase complete.
+state:
+  steps:
+    P1.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T1.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T2.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T3.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T3.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T4.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T4.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []

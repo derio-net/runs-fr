@@ -1,0 +1,42 @@
+schema_version: 2
+phase:
+  number: 3
+  title: Forward-auth middleware
+  tag: agentic
+  depends_on:
+  - 1
+  tracking_issue: null
+tasks:
+- number: 1
+  title: Middleware (TDD)
+  steps:
+  - id: P3.T1.S1
+    text: |
+      RED — `internal/server/auth_test.go`: `RequireForwardAuth(header)` calls next and returns 200 when the configured header is present & non-empty; returns 403 (no next) when absent/empty. Red.
+  - id: P3.T1.S2
+    text: |
+      GREEN — `internal/server/auth.go` middleware reading the configurable header. Test → PASS.
+- number: 2
+  title: Wire gating
+  steps:
+  - id: P3.T2.S1
+    text: |
+      Gate `/api/*` (and the later attach route) with the middleware; assert in a test that `/healthz` is NOT gated (liveness must work pre-auth) but `/api/runs` returns 403 without the header. `go test ./...` green.
+state:
+  steps:
+    P3.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P3.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P3.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []

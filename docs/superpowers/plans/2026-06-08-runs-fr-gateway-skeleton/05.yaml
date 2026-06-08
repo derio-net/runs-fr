@@ -1,0 +1,57 @@
+schema_version: 2
+phase:
+  number: 5
+  title: Frontend (xterm.js + attach)
+  tag: agentic
+  depends_on:
+  - 2
+  - 4
+  tracking_issue: null
+tasks:
+- number: 1
+  title: Frontend sources & build
+  steps:
+  - id: P5.T1.S1
+    text: |
+      `web/package.json` pinning `@xterm/xterm`, `@xterm/addon-fit`, `esbuild` (NOT `@xterm/addon-attach` — see P5.T1.S2; we hand-write the typed-frame pump); `fr isolation exec -- sh -c 'cd web && npm install'`. Expected: lockfile written.
+  - id: P5.T1.S2
+    text: |
+      `web/src/main.ts`: fetch `/api/runs` → render a clickable list; on select open `new WebSocket('/api/runs/<id>/attach')` with `binaryType='arraybuffer'`. Do NOT use AttachAddon (it has no resize control channel and clashes with the typed-frame protocol). Instead: `term.onData(d => ws.send(<binary>))` (BINARY frames = stdin); on `FitAddon` resize send a TEXT frame `JSON.stringify({resize:{cols,rows}})`; on `ws.onmessage` write binary payloads to the terminal. This matches the server's message-type demux (P4.T1). `web/index.html` mounts it.
+  - id: P5.T1.S3
+    text: |
+      esbuild build script → `cmd/runs-fr/static/bundle.js` and copy `@xterm/xterm/css/xterm.css` → `cmd/runs-fr/static/xterm.css`. Add `make frontend` (npm run build). Expected: bundle + css emitted into `cmd/runs-fr/static/`.
+- number: 2
+  title: Embed & serve static
+  steps:
+  - id: P5.T2.S1
+    text: |
+      RED — `internal/server/static_test.go`: `GET /` returns 200 text/html containing the mount node id. Red.
+  - id: P5.T2.S2
+    text: |
+      GREEN — `//go:embed static/*` in the `cmd/runs-fr` package (the ONLY place that works — `go:embed` embeds only at/below the embedding file's dir, which is where the bundle+css land; do NOT use `internal/web`). Serve `/`, `bundle.js`, and `xterm.css` from the embedded FS with baseline security headers (`X-Content-Type-Options: nosniff` + a restrictive `Content-Security-Policy`). Update CI: the `go vet`/`go test`/`go build` steps added in P1.T4 must now run `make frontend` FIRST (the embed directive won't compile with no files present) — amend `.github/workflows/ci.yml` accordingly. Test → PASS.
+state:
+  steps:
+    P5.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P5.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P5.T1.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+    P5.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P5.T2.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []
