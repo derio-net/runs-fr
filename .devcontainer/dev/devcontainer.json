@@ -1,0 +1,22 @@
+{
+  "name": "runs-fr — dev",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/go:1": {},
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  "postCreateCommand": "pipx install uv 2>/dev/null || true; uv tool install 'git+https://github.com/derio-net/super-fr#subdirectory=packages/fr' || true",
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  "runArgs": [
+    "--env-file",
+    "${localEnv:HOME}/.config/fr/secrets/runs-fr/dev.env"
+  ],
+  "customizations": {
+    "fr": {
+      "profile": "dev",
+      "purpose": "build/test runs-fr gateway: go build/test/vet, golangci-lint, esbuild frontend, helm lint/template"
+    }
+  }
+}

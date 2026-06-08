@@ -1,0 +1,12 @@
+# golangci-lint v2 config (see ci.yml: golangci-lint-action@v9, version v2.x).
+# v2 enables errcheck, govet, ineffassign, staticcheck, and unused by default;
+# we add misspell, and run gofmt via the formatters section.
+version: "2"
+
+linters:
+  enable:
+    - misspell
+
+formatters:
+  enable:
+    - gofmt
