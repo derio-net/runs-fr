@@ -71,6 +71,11 @@ func New(cfg *config.Config, opts ...Option) http.Handler {
 	// behind the middleware so an unauthenticated request is rejected with 403
 	// before reaching any handler. The sub-mux sees the original request path
 	// (ServeMux does not strip the prefix), so routes register their full path.
+	//
+	// Trust boundary: the gateway cannot distinguish a proxy-set header from a
+	// client-spoofed one, so the upstream forward-auth proxy MUST overwrite
+	// cfg.AuthHeader on every inbound request. The Ingress manifests (later
+	// phase) own that guarantee.
 	apiMux := http.NewServeMux()
 	if s.lister != nil {
 		apiMux.HandleFunc("GET /api/runs", s.handleRuns)
