@@ -1,0 +1,63 @@
+package runs
+
+import (
+	"context"
+	"fmt"
+	"sort"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
+)
+
+// Label keys carried by run pods, projected into a Run.
+const (
+	labelID      = "fr.run/id"
+	labelPlan    = "fr.run/plan"
+	labelPhase   = "fr.run/phase"
+	labelBranch  = "fr.run/branch"
+	labelHarness = "fr.run/harness"
+)
+
+// Lister lists run pods in a namespace and maps them into Runs.
+type Lister struct {
+	client    kubernetes.Interface
+	namespace string
+	selector  labels.Selector
+}
+
+// NewLister builds a Lister scoped to a namespace and label selector.
+func NewLister(client kubernetes.Interface, namespace string, selector labels.Selector) *Lister {
+	return &Lister{client: client, namespace: namespace, selector: selector}
+}
+
+// List returns the live runs, one per matching pod, sorted by id.
+func (l *Lister) List(ctx context.Context) ([]Run, error) {
+	pods, err := l.client.CoreV1().Pods(l.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: l.selector.String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("runs: list pods: %w", err)
+	}
+
+	out := make([]Run, 0, len(pods.Items))
+	for i := range pods.Items {
+		out = append(out, runFromPod(&pods.Items[i]))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+// runFromPod projects a pod's fr.run/* labels and status phase into a Run.
+func runFromPod(pod *corev1.Pod) Run {
+	return Run{
+		ID:      pod.Labels[labelID],
+		Plan:    pod.Labels[labelPlan],
+		Phase:   pod.Labels[labelPhase],
+		Branch:  pod.Labels[labelBranch],
+		Harness: pod.Labels[labelHarness],
+		Status:  string(pod.Status.Phase),
+		PodName: pod.Name,
+	}
+}
