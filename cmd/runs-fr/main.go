@@ -53,6 +53,10 @@ func main() {
 
 	select {
 	case err := <-errCh:
+		// Reached when ListenAndServe fails before any signal — e.g. the
+		// listen address is already in use. (After a signal, ListenAndServe
+		// returns ErrServerClosed, which the goroutine maps to a nil send that
+		// is simply drained as the process exits via the ctx.Done branch.)
 		if err != nil {
 			log.Error("server error", "err", err)
 			os.Exit(1)

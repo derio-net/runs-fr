@@ -46,4 +46,8 @@ func TestReadyz(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /readyz status = %d, want %d", rec.Code, http.StatusOK)
 	}
+	body, _ := io.ReadAll(rec.Result().Body)
+	if got := string(body); got != "ok" {
+		t.Errorf("GET /readyz body = %q, want %q", got, "ok")
+	}
 }
