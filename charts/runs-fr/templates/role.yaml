@@ -1,0 +1,16 @@
+# Namespace-scoped Role — NEVER a ClusterRole. The gateway only needs to list
+# run pods and open exec streams within the single watched namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "runs-fr.fullname" . }}
+  namespace: {{ include "runs-fr.watchNamespace" . }}
+  labels:
+    {{- include "runs-fr.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]

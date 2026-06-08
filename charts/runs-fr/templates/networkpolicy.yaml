@@ -1,0 +1,26 @@
+{{- if .Values.networkPolicy.enabled }}
+# NetworkPolicy is opt-in. It restricts ingress to the gateway's container port,
+# from the trusted forward-auth proxy only (networkPolicy.from). An empty
+# `from` list allows same-namespace traffic — set it to your proxy's selector
+# in production so nothing else can reach the gateway and spoof the auth header.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "runs-fr.fullname" . }}
+  labels:
+    {{- include "runs-fr.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "runs-fr.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+      {{- with .Values.networkPolicy.from }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

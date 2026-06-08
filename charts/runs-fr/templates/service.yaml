@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "runs-fr.fullname" . }}
+  labels:
+    {{- include "runs-fr.labels" . | nindent 4 }}
+spec:
+  # type defaults to ClusterIP — direct external exposure bypasses the
+  # trust-a-header auth (see SECURITY MODEL in values.yaml).
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "runs-fr.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP

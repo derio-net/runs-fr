@@ -1,0 +1,23 @@
+runs-fr has been installed as release {{ .Release.Name }}.
+
+  Watched namespace: {{ include "runs-fr.watchNamespace" . }}
+  Label selector:    {{ .Values.labelSelector }}
+  Auth header:       {{ .Values.authHeader }}
+
+SECURITY: runs-fr trusts the "{{ .Values.authHeader }}" header to identify the
+user and performs NO authentication itself. Only expose it through a
+forward-auth proxy that SETS or OVERWRITES that header on every request.
+
+{{- if .Values.ingress.enabled }}
+
+Ingress is ENABLED for host {{ .Values.ingress.host | quote }}. Confirm a
+forward-auth proxy sits in front of it before sending real traffic.
+{{- else }}
+
+The Service is {{ .Values.service.type }} (no external exposure). Reach it via:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "runs-fr.fullname" . }} 8080:{{ .Values.service.port }}
+
+Note: port-forward bypasses the forward-auth proxy — use it for smoke checks
+only, never as a production access path.
+{{- end }}
