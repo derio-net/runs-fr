@@ -66,13 +66,18 @@ ingress:
   tls: []
 
 networkPolicy:
-  # enabled is opt-in. When true, ingress to the gateway is restricted to the
-  # trusted proxy (see from/podSelector/namespaceSelector below) on the gateway
-  # container port. Leave both selectors empty to allow same-namespace traffic.
+  # enabled is opt-in and DEFAULT-DENY. When true, ingress to the gateway is
+  # restricted to the peers listed in `from` (the trusted forward-auth proxy) on
+  # the gateway container port; everything else is denied.
   enabled: false
   # from is a list of NetworkPolicy peers (podSelector / namespaceSelector /
-  # ipBlock) identifying the trusted forward-auth proxy. Empty same-namespace
-  # default below; replace with your proxy's selector in production.
+  # ipBlock) identifying the trusted forward-auth proxy. An EMPTY list denies
+  # ALL ingress (safe-but-unreachable) — set it to your proxy's selector so the
+  # gateway is reachable only via the proxy. Example:
+  #   from:
+  #     - podSelector:
+  #         matchLabels:
+  #           app.kubernetes.io/name: forward-auth-proxy
   from: []
 
 resources:
