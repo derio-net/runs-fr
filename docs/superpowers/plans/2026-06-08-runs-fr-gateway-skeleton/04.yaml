@@ -1,0 +1,74 @@
+schema_version: 2
+phase:
+  number: 4
+  title: Exec ↔ websocket terminal bridge
+  tag: agentic
+  depends_on:
+  - 1
+  - 3
+  tracking_issue: null
+tasks:
+- number: 1
+  title: terminalSession type (TDD)
+  steps:
+  - id: P4.T1.S1
+    text: |
+      Add deps `github.com/coder/websocket` and `k8s.io/client-go/tools/remotecommand` (transitively present). `go build ./...` ok.
+  - id: P4.T1.S2
+    text: |
+      RED — `internal/term/session_test.go`: the session demuxes on WEBSOCKET MESSAGE TYPE (robust; do NOT content-sniff the payload). Feed queued inbound frames and assert (a) a BINARY frame's bytes surface via `Read` as stdin; (b) a TEXT frame `{"resize":{"cols":C,"rows":R}}` makes `Next()` return that TerminalSize and does NOT leak into `Read`; (c) `Write(p)` emits p to the outbound sink as a BINARY frame (terminal output). Red.
+  - id: P4.T1.S3
+    text: |
+      GREEN — `internal/term/session.go`: `session` implements io.Reader, io.Writer, remotecommand.TerminalSizeQueue; it reads inbound coder/websocket messages and demuxes BY TYPE — `MessageBinary` → stdin (`Read`), `MessageText` → parse `{"resize":…}` and push to a buffered size channel (`Next`); `Write` sends `MessageBinary`. Test → PASS.
+- number: 2
+  title: Exec request + fallback executor
+  steps:
+  - id: P4.T2.S1
+    text: |
+      RED — `internal/term/exec_test.go`: `BuildExecURL(clientset, ns, pod, sessionName)` returns a `*url.URL` for the pod `exec` subresource whose query-encoded `PodExecOptions` has Command `["tmux","attach","-t",sessionName]`, TTY true, Stdin/Stdout true (Stderr false under a TTY). Assert on the `*url.URL` path + query params — NOT a request object, and NOT a baked-in HTTP method (method is supplied per-executor). Red.
+  - id: P4.T2.S2
+    text: |
+      GREEN — `internal/term/exec.go`: `BuildExecURL` = `clientset.CoreV1().RESTClient().Post().Namespace(ns).Resource("pods").Name(pod).SubResource("exec").VersionedParams(&corev1.PodExecOptions{…}, scheme.ParameterCodec).URL()` (the `.Post()` builder only constructs the method-agnostic URL). `NewExecutor(cfg, u)` = `remotecommand.NewFallbackExecutor(ws, spdy, httpstream.IsUpgradeFailure)` where `ws,_ = remotecommand.NewWebSocketExecutor(cfg, "GET", u.String())` (websocket upgrade is GET, takes a URL STRING) and `spdy,_ = remotecommand.NewSPDYExecutor(cfg, "POST", u)` (SPDY is POST, takes `*url.URL`); handle the `(Executor, error)` returns of all three. Test → PASS. (Live `StreamWithContext` needs a kubelet → Phase 8.)
+- number: 3
+  title: Attach websocket endpoint
+  steps:
+  - id: P4.T3.S1
+    text: |
+      RED — `internal/server/attach_test.go`: `GET /api/runs/{id}/attach` (a) returns 403 without the auth header; (b) returns 400 for an id failing `^[a-z0-9-]+$` and 404 when no pod matches `fr.run/id=<id>` — both BEFORE any ws upgrade; (c) with a valid+matched id and the header, completes the coder/websocket handshake and, given a stubbed executor runner, pipes session data; (d) cancelling the request context makes the executor goroutine exit (no leak). Mock the exec runner via an injected interface. Red.
+  - id: P4.T3.S2
+    text: |
+      GREEN — attach handler: validate `{id}` (`^[a-z0-9-]+$`, else 400); resolve the pod by LABEL match `fr.run/id=<id>` (404 if none; if ambiguous pick deterministically) and use the RESOLVED pod's actual name as the exec target — never interpolate the raw path segment into the K8s request; the tmux session name is derived from the validated id. Accept ws; derive the exec/ws context from the request context AND the server-shutdown signal; run `executor.StreamWithContext(ctx, …)` in a goroutine; pump ws↔session; run a periodic `conn.Ping(ctx)` with a read deadline for dead-peer detection; close on ctx/err. Register the gated route. Test → PASS; `go test ./...` green.
+state:
+  steps:
+    P4.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P4.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P4.T1.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+    P4.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P4.T2.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P4.T3.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P4.T3.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []

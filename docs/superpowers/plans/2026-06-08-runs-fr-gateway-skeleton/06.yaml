@@ -1,0 +1,49 @@
+schema_version: 2
+phase:
+  number: 6
+  title: Helm chart
+  tag: agentic
+  depends_on:
+  - 1
+  tracking_issue: null
+tasks:
+- number: 1
+  title: Chart skeleton & templates
+  steps:
+  - id: P6.T1.S1
+    text: |
+      `charts/runs-fr/Chart.yaml` + `values.yaml`: image.repository/tag/pullPolicy, namespace, labelSelector, authHeader, `service.type` (DEFAULT `ClusterIP` — direct exposure bypasses the trust-a-header auth), ingress.{enabled=false by default,className,host}, `networkPolicy.enabled` (opt-in), resources, replicaCount, serviceAccount.name.
+  - id: P6.T1.S2
+    text: |
+      Templates: `deployment.yaml` (env NAMESPACE/LABEL_SELECTOR/AUTH_HEADER from values; **liveness probe `/healthz`, readiness probe `/readyz`**; hardened securityContext: `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]` — matches the repo's hardened-pod convention), `service.yaml` (type from values, ClusterIP default), `serviceaccount.yaml`, `role.yaml` (rules: pods get/list/watch + pods/exec create — NAMESPACE-scoped Role, never ClusterRole), `rolebinding.yaml`, `_helpers.tpl`, optional `ingress.yaml` (gated on ingress.enabled), optional `networkpolicy.yaml` (gated on networkPolicy.enabled) restricting ingress to the trusted proxy. Add a values comment: the gateway MUST only be reachable via a forward-auth proxy that SETS/OVERWRITES the auth header; direct Service/Ingress access bypasses auth.
+- number: 2
+  title: Validate (lint + golden)
+  steps:
+  - id: P6.T2.S1
+    text: |
+      `fr isolation exec -- helm lint charts/runs-fr` → passes.
+  - id: P6.T2.S2
+    text: |
+      Golden assert: `helm template charts/runs-fr` (default + `--set ingress.enabled=true`) and grep-assert: Role has `pods/exec` create; NO `kind: ClusterRole`/`ClusterRoleBinding`; Service type is `ClusterIP` by default; deployment has `readOnlyRootFilesystem: true` + `capabilities.drop: [ALL]`; ingress rendered ONLY when enabled. Add the assert script to CI. Expected: all pass.
+state:
+  steps:
+    P6.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P6.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P6.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P6.T2.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []

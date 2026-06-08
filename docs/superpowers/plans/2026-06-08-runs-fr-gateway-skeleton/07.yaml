@@ -1,0 +1,50 @@
+schema_version: 2
+phase:
+  number: 7
+  title: Container image & release CI
+  tag: agentic
+  depends_on:
+  - 5
+  - 6
+  tracking_issue: null
+tasks:
+- number: 1
+  title: Dockerfile
+  steps:
+  - id: P7.T1.S1
+    text: |
+      Multi-stage `Dockerfile`: stage1 node → `npm run build`; stage2 golang → CGO_ENABLED=0 static build; final `gcr.io/distroless/static:nonroot`, copy binary, USER nonroot, EXPOSE 8080. Add `.dockerignore`.
+  - id: P7.T1.S2
+    text: |
+      Local smoke (docker is available on the host): `docker build -t runs-fr:dev .` then `docker run -p 8080:8080 -e NAMESPACE=x runs-fr:dev` → `curl localhost:8080/healthz` == "ok". Expected: 200.
+- number: 2
+  title: Release CI & README
+  steps:
+  - id: P7.T2.S1
+    text: |
+      `.github/workflows/release.yml`: on tag push → docker/build-push-action to `ghcr.io/derio-net/runs-fr` tagged with git sha + the pushed tag.
+  - id: P7.T2.S2
+    text: |
+      `README.md`: what it is, config env table, `helm install` usage, and the **forward-auth-header SECURITY contract stated explicitly**: the gateway trusts the configured header, so it MUST sit behind a proxy that SETS AND OVERWRITES that header on every request; exposing the Service/Ingress directly (or a proxy that merely ADDS the header) lets any client spoof it and reach `pods/exec`. Document the ClusterIP-default + opt-in NetworkPolicy posture. Plus `fr isolation` dev instructions. Note: Frank deploy wiring (Authentik forward-auth + Ingress + homepage tile) is a SEPARATE frank batch.
+state:
+  steps:
+    P7.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P7.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P7.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P7.T2.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []

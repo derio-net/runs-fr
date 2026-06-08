@@ -1,0 +1,39 @@
+schema_version: 2
+phase:
+  number: 8
+  title: '[manual] Post-merge cluster verification'
+  tag: manual
+  depends_on:
+  - 7
+  tracking_issue: null
+tasks:
+- number: 1
+  title: Deploy & verify on a cluster
+  steps:
+  - id: P8.T1.S1
+    text: |
+      (manual) After image build/push: `helm install runs-fr charts/runs-fr -n <test-ns> --create-namespace --set namespace=<test-ns> --set image.tag=<sha>`. Create a labelled probe pod (labels `fr.run/id=demo` …) running `tmux new -d -s demo`.
+  - id: P8.T1.S2
+    text: |
+      (manual) Reach the gateway (port-forward or temp Ingress). Verify: `/api/runs` lists the demo pod; browser attach shows the live tmux session; typing + window resize work; a request WITHOUT the auth header → 403.
+  - id: P8.T1.S3
+    text: |
+      (manual) Record results in the PR; this is the spec's two-tier real-path (Tier-2) proof. Clean up test resources. Flag the Frank deploy-wiring batch as next.
+state:
+  steps:
+    P8.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P8.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P8.T1.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []

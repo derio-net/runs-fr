@@ -1,0 +1,73 @@
+schema_version: 2
+phase:
+  number: 2
+  title: Run-listing API
+  tag: agentic
+  depends_on:
+  - 1
+  tracking_issue: null
+tasks:
+- number: 1
+  title: Kubernetes client
+  steps:
+  - id: P2.T1.S1
+    text: |
+      Add deps as a single coherent client-go line pinned to EXACT patch versions (NOT a floating `@v0.31`, which `go get` resolves non-deterministically). Choose the line deliberately for the target cluster (Frank is K8s 1.35; client-go tolerates ±1 minor skew, so prefer the closest available line — e.g. `k8s.io/client-go@v0.32.x` + matching `k8s.io/api`/`k8s.io/apimachinery`) and record the exact versions in go.mod. The line must include the mature websocket-exec client (`remotecommand.NewWebSocketExecutor`/`NewFallbackExecutor`). Expected: go.mod pins exact patches, `go build ./...` ok.
+  - id: P2.T1.S2
+    text: |
+      RED — `internal/kube/client_test.go`: test `BuildSelector(cfg)` returns a valid labels.Selector for LABEL_SELECTOR; test that `RestConfig()` falls back to KUBECONFIG when not in-cluster (temp kubeconfig fixture). ALSO `internal/server/ready_test.go`: `/readyz` returns 503 when a stub readiness-checker errors and 200 when it succeeds (readiness must reflect API/RBAC reachability, distinct from liveness). Red.
+  - id: P2.T1.S3
+    text: |
+      GREEN — `internal/kube/client.go`: `RestConfig()` (rest.InClusterConfig() else clientcmd from cfg.KUBECONFIG/$KUBECONFIG/~/.kube/config), `NewClientset()`, `BuildSelector()`. Enhance `/readyz` to call a lightweight readiness check (e.g. `Pods(ns).List(ctx, {Limit:1})`) so a pod with broken SA/RBAC is pulled from Service endpoints. Test → PASS.
+- number: 2
+  title: Run lister (TDD with fake clientset)
+  steps:
+  - id: P2.T2.S1
+    text: |
+      RED — `internal/runs/lister_test.go` using `k8s.io/client-go/kubernetes/fake.NewSimpleClientset`: seed 2 pods labelled `fr.run/id`,`fr.run/plan`,`fr.run/phase`,`fr.run/branch`,`fr.run/harness` with differing `status.phase`; assert `Lister.List(ctx)` returns []Run with those fields mapped + Status from pod phase, sorted by id. Red.
+  - id: P2.T2.S2
+    text: |
+      GREEN — `internal/runs/run.go` (`Run` struct: ID, Plan, Phase, Branch, Harness, Status, PodName) + `internal/runs/lister.go` (`Lister.List` → CoreV1().Pods(ns). List(selector) → map labels→Run). Test → PASS.
+- number: 3
+  title: GET /api/runs handler
+  steps:
+  - id: P2.T3.S1
+    text: |
+      RED — `internal/server/runs_handler_test.go`: handler over a stub lister returns `application/json` array matching the runs. Red.
+  - id: P2.T3.S2
+    text: |
+      GREEN — implement the handler (inject a runs lister interface), register `GET /api/runs`. Test → PASS; `go test ./...` green.
+state:
+  steps:
+    P2.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P2.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P2.T1.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+    P2.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P2.T2.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P2.T3.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P2.T3.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []

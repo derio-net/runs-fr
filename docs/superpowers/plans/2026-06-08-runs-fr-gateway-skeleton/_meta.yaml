@@ -1,0 +1,6 @@
+schema_version: 2
+plan: 2026-06-08-runs-fr-gateway-skeleton
+spec: derio-net/frank:docs/superpowers/specs/2026-06-07--agents--k8s-native-runs-design.md
+target_repo: derio-net/runs-fr
+fr_version: '>=3.0.0,<4.0.0'
+created: '2026-06-08'
