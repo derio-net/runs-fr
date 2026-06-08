@@ -6,7 +6,7 @@ phase:
   depends_on:
   - 1
   - 3
-  tracking_issue: null
+  tracking_issue: https://github.com/derio-net/runs-fr/issues/5
 tasks:
 - number: 1
   title: terminalSession type (TDD)
