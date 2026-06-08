@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/derio-net/runs-fr/internal/config"
+	"github.com/derio-net/runs-fr/internal/kube"
+	"github.com/derio-net/runs-fr/internal/runs"
 	"github.com/derio-net/runs-fr/internal/server"
 )
 
@@ -30,6 +32,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Build the Kubernetes client surface up front: the gateway can't function
+	// without it, so fail fast rather than degrade.
+	selector, err := kube.BuildSelector(cfg)
+	if err != nil {
+		log.Error("build selector", "err", err)
+		os.Exit(1)
+	}
+	clientset, err := kube.NewClientset(cfg)
+	if err != nil {
+		log.Error("build kubernetes client", "err", err)
+		os.Exit(1)
+	}
+
+	lister := runs.NewLister(clientset, cfg.Namespace, selector)
+	readiness := kube.Readiness(clientset, cfg.Namespace)
+
 	// Trip cancellation on SIGTERM/SIGINT so rollouts drain in-flight attaches
 	// instead of dropping them.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -37,7 +55,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: server.New(cfg),
+		Handler: server.New(cfg, server.WithReadiness(readiness), server.WithLister(lister)),
 	}
 
 	// Run the listener in the background so main can wait on the signal context.
