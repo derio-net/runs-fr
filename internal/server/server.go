@@ -59,11 +59,23 @@ func New(cfg *config.Config, opts ...Option) http.Handler {
 	}
 
 	mux := http.NewServeMux()
+
+	// Liveness/readiness probes are ungated: kubelet carries no forward-auth
+	// header, so gating them would break the probes.
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/readyz", s.handleReadyz)
+
+	// Everything under /api/ (the run-list now, the attach route in a later
+	// phase) is gated by the trusted forward-auth header: apiMux is mounted
+	// behind the middleware so an unauthenticated request is rejected with 403
+	// before reaching any handler. The sub-mux sees the original request path
+	// (ServeMux does not strip the prefix), so routes register their full path.
+	apiMux := http.NewServeMux()
 	if s.lister != nil {
-		mux.HandleFunc("GET /api/runs", s.handleRuns)
+		apiMux.HandleFunc("GET /api/runs", s.handleRuns)
 	}
+	mux.Handle("/api/", RequireForwardAuth(s.cfg.AuthHeader)(apiMux))
+
 	return mux
 }
 
