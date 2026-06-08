@@ -1,0 +1,17 @@
+# RoleBinding lives in the watched namespace (alongside the Role) and binds the
+# gateway's ServiceAccount — which may reside in the release namespace — to it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "runs-fr.fullname" . }}
+  namespace: {{ include "runs-fr.watchNamespace" . }}
+  labels:
+    {{- include "runs-fr.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "runs-fr.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "runs-fr.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}

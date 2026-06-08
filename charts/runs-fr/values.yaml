@@ -1,0 +1,97 @@
+# Default values for runs-fr.
+#
+# SECURITY MODEL — READ THIS FIRST
+# --------------------------------
+# runs-fr trusts a single request header (authHeader, default X-Forwarded-User)
+# to identify the authenticated user. It performs NO authentication of its own.
+# The gateway MUST therefore only ever be reachable via a forward-auth proxy
+# (e.g. Authentik / oauth2-proxy / Traefik forwardAuth) that SETS or OVERWRITES
+# that header on every request. Anyone able to reach the Service or Ingress
+# directly can spoof the header and attach to run pods. For this reason:
+#   * service.type defaults to ClusterIP (no direct external exposure).
+#   * ingress is disabled by default; enable it ONLY behind a forward-auth proxy.
+#   * networkPolicy (opt-in) can lock ingress down to the trusted proxy only.
+
+# replicaCount is the number of gateway pods. Attaches are stateless per
+# connection, so this can be scaled horizontally.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/derio-net/runs-fr
+  # tag defaults to the chart's appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# imagePullSecrets references registry credentials for a private image.
+imagePullSecrets: []
+
+# nameOverride / fullnameOverride tweak the generated resource names.
+nameOverride: ""
+fullnameOverride: ""
+
+# namespace is the Kubernetes namespace the gateway WATCHES for run pods
+# (exported as the NAMESPACE env var). Empty means "the release namespace".
+# The pods/exec Role is created in this namespace.
+namespace: ""
+
+# labelSelector selects run pods (exported as LABEL_SELECTOR).
+labelSelector: "fr.run/id"
+
+# authHeader is the trusted header carrying the authenticated user, set by the
+# upstream forward-auth proxy (exported as AUTH_HEADER). See SECURITY MODEL.
+authHeader: "X-Forwarded-User"
+
+serviceAccount:
+  # create toggles whether the chart creates the ServiceAccount.
+  create: true
+  # name overrides the generated ServiceAccount name; empty uses the fullname.
+  name: ""
+  # annotations attached to the ServiceAccount (e.g. cloud IAM bindings).
+  annotations: {}
+
+service:
+  # type is ClusterIP by default. Do NOT switch to LoadBalancer/NodePort unless
+  # a forward-auth proxy sits in front — direct exposure bypasses the
+  # trust-a-header auth (see SECURITY MODEL).
+  type: ClusterIP
+  port: 80
+
+ingress:
+  # enabled is false by default. Enable ONLY behind a forward-auth proxy that
+  # sets the auth header (see SECURITY MODEL).
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  tls: []
+
+networkPolicy:
+  # enabled is opt-in and DEFAULT-DENY. When true, ingress to the gateway is
+  # restricted to the peers listed in `from` (the trusted forward-auth proxy) on
+  # the gateway container port; everything else is denied.
+  enabled: false
+  # from is a list of NetworkPolicy peers (podSelector / namespaceSelector /
+  # ipBlock) identifying the trusted forward-auth proxy. An EMPTY list denies
+  # ALL ingress (safe-but-unreachable) — set it to your proxy's selector so the
+  # gateway is reachable only via the proxy. Example:
+  #   from:
+  #     - podSelector:
+  #         matchLabels:
+  #           app.kubernetes.io/name: forward-auth-proxy
+  from: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+
+# podAnnotations / podLabels are merged onto the gateway pod template.
+podAnnotations: {}
+podLabels: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

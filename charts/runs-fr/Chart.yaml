@@ -1,0 +1,16 @@
+apiVersion: v2
+name: runs-fr
+description: Kubernetes-native web shell gateway for agentic runs — list live run pods and attach to their sessions in the browser, behind a forward-auth proxy.
+type: application
+# version is the chart version; appVersion tracks the gateway image. Both are
+# bumped together for the walking skeleton.
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/derio-net/runs-fr
+sources:
+  - https://github.com/derio-net/runs-fr
+keywords:
+  - kubernetes
+  - terminal
+  - web-shell
+  - agentic-runs

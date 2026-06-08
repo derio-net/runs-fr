@@ -28,22 +28,25 @@ tasks:
 state:
   steps:
     P6.T1.S1:
-      state: ' '
-      ticked_at: null
+      state: x
+      ticked_at: '2026-06-08T14:17:05+00:00'
       note: null
     P6.T1.S2:
-      state: ' '
-      ticked_at: null
+      state: x
+      ticked_at: '2026-06-08T14:17:06+00:00'
       note: null
     P6.T2.S1:
-      state: ' '
-      ticked_at: null
-      note: null
+      state: x
+      ticked_at: '2026-06-08T14:17:06+00:00'
+      note: helm lint clean (only cosmetic 'icon is recommended'); run via charts/runs-fr/test/assert.sh,
+        wired into CI helm job (helm absent from exec pod, fetched ad-hoc to verify)
     P6.T2.S2:
-      state: ' '
-      ticked_at: null
-      note: null
+      state: x
+      ticked_at: '2026-06-08T14:17:06+00:00'
+      note: Assert script charts/runs-fr/test/assert.sh added to CI; all golden grep-asserts
+        pass (pods/exec, no ClusterRole, ClusterIP default, hardened securityContext,
+        ingress only when enabled)
   completion:
-    at: null
+    at: '2026-06-08T14:17:09+00:00'
     note: null
     observed_prs: []

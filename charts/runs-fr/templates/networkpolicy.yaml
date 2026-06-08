@@ -1,0 +1,34 @@
+{{- if .Values.networkPolicy.enabled }}
+# NetworkPolicy is opt-in and DEFAULT-DENY for ingress: with policyTypes
+# [Ingress] and no matching rule, ALL inbound traffic to the gateway is denied.
+# Set networkPolicy.from to the trusted forward-auth proxy's peer(s) so that it
+# — and only it — can reach the gateway on the container port. Leaving `from`
+# empty denies all ingress: a safe-but-unreachable failure mode that forces you
+# to name the proxy explicitly rather than silently exposing the gateway to the
+# whole cluster (a bare rule with ports and no `from` would match every source).
+# Kubelet probe traffic to the port is node-sourced and is unaffected by
+# NetworkPolicy in standard CNIs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "runs-fr.fullname" . }}
+  labels:
+    {{- include "runs-fr.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "runs-fr.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  {{- with .Values.networkPolicy.from }}
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+      from:
+        {{- toYaml . | nindent 8 }}
+  {{- else }}
+  # No trusted peer configured → deny all ingress (see header comment).
+  ingress: []
+  {{- end }}
+{{- end }}
