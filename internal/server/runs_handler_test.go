@@ -28,7 +28,10 @@ func TestRunsHandler(t *testing.T) {
 
 	h := New(testConfig(), WithLister(stubLister{runs: want}))
 
+	// /api/runs is behind the forward-auth gate (Phase 3), so the handler test
+	// supplies the trusted header an upstream proxy would set.
 	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
+	req.Header.Set(authTestHeader, "tester")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -52,6 +55,7 @@ func TestRunsHandlerListError(t *testing.T) {
 	h := New(testConfig(), WithLister(stubLister{err: context.DeadlineExceeded}))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
+	req.Header.Set(authTestHeader, "tester")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 

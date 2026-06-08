@@ -46,8 +46,9 @@ func WithLister(l RunLister) Option {
 }
 
 // New builds the gateway's HTTP handler from the given configuration. The
-// returned handler serves liveness (/healthz) and readiness (/readyz) probes;
-// the run-list and attach routes are added in later phases.
+// returned handler serves liveness (/healthz) and readiness (/readyz) probes
+// and, when a lister is injected, the forward-auth-gated GET /api/runs; the
+// attach route is added in a later phase.
 func New(cfg *config.Config, opts ...Option) http.Handler {
 	s := &server{
 		cfg:   cfg,
