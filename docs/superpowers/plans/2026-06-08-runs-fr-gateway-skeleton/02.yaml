@@ -5,7 +5,7 @@ phase:
   tag: agentic
   depends_on:
   - 1
-  tracking_issue: null
+  tracking_issue: https://github.com/derio-net/runs-fr/issues/3
 tasks:
 - number: 1
   title: Kubernetes client
