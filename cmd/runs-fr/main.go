@@ -69,6 +69,8 @@ func main() {
 			// exec stream. Bind sessions to ctx so a SIGTERM drains them.
 			server.WithAttach(lister, attacher),
 			server.WithShutdownContext(ctx),
+			// Serve the embedded xterm.js frontend at /.
+			server.WithStatic(staticFS()),
 		),
 	}
 

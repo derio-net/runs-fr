@@ -1,0 +1,17 @@
+{
+  "name": "runs-fr-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "xterm.js frontend for the runs-fr gateway, bundled with esbuild and embedded into the Go binary.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}
