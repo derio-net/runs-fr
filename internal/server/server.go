@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"log/slog"
 	"net/http"
 
@@ -31,6 +32,7 @@ type server struct {
 	resolver    RunResolver
 	attacher    Attacher
 	shutdownCtx context.Context
+	static      fs.FS
 }
 
 // Option configures the server's injected dependencies.
@@ -68,6 +70,11 @@ func New(cfg *config.Config, opts ...Option) http.Handler {
 	// header, so gating them would break the probes.
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/readyz", s.handleReadyz)
+
+	// The frontend (page shell + bundle + stylesheet) is served ungated when a
+	// static FS is injected; it carries no run data and the upstream proxy
+	// already gates the whole origin.
+	s.registerStatic(mux)
 
 	// Everything under /api/ (the run-list now, the attach route in a later
 	// phase) is gated by the trusted forward-auth header: apiMux is mounted

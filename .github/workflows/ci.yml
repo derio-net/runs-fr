@@ -19,6 +19,15 @@ jobs:
           go-version: "1.23"
           cache: true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The frontend bundle is embedded via //go:embed into cmd/runs-fr, so it
+      # must be built before any go vet/test/build step compiles that package.
+      - name: frontend
+        run: make frontend
+
       - name: vet
         run: go vet ./...
 
