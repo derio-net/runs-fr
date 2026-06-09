@@ -17,6 +17,7 @@ import (
 	"github.com/derio-net/runs-fr/internal/kube"
 	"github.com/derio-net/runs-fr/internal/runs"
 	"github.com/derio-net/runs-fr/internal/server"
+	"github.com/derio-net/runs-fr/internal/term"
 )
 
 // shutdownTimeout bounds how long graceful shutdown waits for in-flight
@@ -39,6 +40,11 @@ func main() {
 		log.Error("build selector", "err", err)
 		os.Exit(1)
 	}
+	restCfg, err := kube.RestConfig(cfg)
+	if err != nil {
+		log.Error("resolve kubernetes config", "err", err)
+		os.Exit(1)
+	}
 	clientset, err := kube.NewClientset(cfg)
 	if err != nil {
 		log.Error("build kubernetes client", "err", err)
@@ -46,6 +52,7 @@ func main() {
 	}
 
 	lister := runs.NewLister(clientset, cfg.Namespace, selector)
+	attacher := term.NewKubeAttacher(restCfg, clientset, cfg.Namespace)
 	readiness := kube.Readiness(clientset, cfg.Namespace)
 
 	// Trip cancellation on SIGTERM/SIGINT so rollouts drain in-flight attaches
@@ -54,8 +61,15 @@ func main() {
 	defer stop()
 
 	srv := &http.Server{
-		Addr:    cfg.Addr,
-		Handler: server.New(cfg, server.WithReadiness(readiness), server.WithLister(lister)),
+		Addr: cfg.Addr,
+		Handler: server.New(cfg,
+			server.WithReadiness(readiness),
+			server.WithLister(lister),
+			// The lister resolves a run id to its pod; the attacher bridges the
+			// exec stream. Bind sessions to ctx so a SIGTERM drains them.
+			server.WithAttach(lister, attacher),
+			server.WithShutdownContext(ctx),
+		),
 	}
 
 	// Run the listener in the background so main can wait on the signal context.

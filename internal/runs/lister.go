@@ -2,6 +2,7 @@ package runs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -10,6 +11,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
+
+// ErrNotFound reports that no live pod carries fr.run/id=<id>. The attach
+// handler maps it to a 404.
+var ErrNotFound = errors.New("runs: no pod for id")
 
 // Label keys carried by run pods, projected into a Run.
 const (
@@ -47,6 +52,30 @@ func (l *Lister) List(ctx context.Context) ([]Run, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
+}
+
+// Resolve returns the name of the live pod carrying fr.run/id=<id>. It queries
+// by that exact label (independent of the gateway's configured list selector)
+// so the attach target is the run the caller named. ErrNotFound is returned
+// when no pod matches; if several do, the lowest pod name is chosen
+// deterministically so repeated attaches land on the same pod.
+func (l *Lister) Resolve(ctx context.Context, id string) (string, error) {
+	pods, err := l.client.CoreV1().Pods(l.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelID + "=" + id,
+	})
+	if err != nil {
+		return "", fmt.Errorf("runs: resolve pod for id %q: %w", id, err)
+	}
+	if len(pods.Items) == 0 {
+		return "", ErrNotFound
+	}
+	name := pods.Items[0].Name
+	for i := range pods.Items {
+		if pods.Items[i].Name < name {
+			name = pods.Items[i].Name
+		}
+	}
+	return name, nil
 }
 
 // runFromPod projects a pod's fr.run/* labels and status phase into a Run.
