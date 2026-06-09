@@ -75,6 +75,11 @@ func (s *session) Read(p []byte) (int, error) {
 		}
 		switch typ {
 		case websocket.MessageBinary:
+			if len(data) == 0 {
+				// An empty stdin frame carries nothing; returning (0, nil) is a
+				// discouraged io.Reader result, so keep reading for real input.
+				continue
+			}
 			n := copy(p, data)
 			if n < len(data) {
 				s.leftover = data[n:]

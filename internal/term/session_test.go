@@ -80,6 +80,32 @@ func TestSession_TextResizeGoesToNextNotRead(t *testing.T) {
 	}
 }
 
+// When resizes arrive faster than Next() drains them, the latest size must win:
+// the capacity-1 channel drops the stale size rather than the new one (and never
+// blocks the Read pump).
+func TestSession_LatestResizeWins(t *testing.T) {
+	conn := &fakeConn{in: []frame{
+		{typ: websocket.MessageText, data: []byte(`{"resize":{"cols":80,"rows":24}}`)},
+		{typ: websocket.MessageText, data: []byte(`{"resize":{"cols":200,"rows":50}}`)},
+		{typ: websocket.MessageBinary, data: []byte("x")},
+	}}
+	s := newSession(context.Background(), conn)
+
+	// Drive both resizes through the demux without an intervening Next().
+	buf := make([]byte, 64)
+	if _, err := s.Read(buf); err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+
+	sz := s.Next()
+	if sz == nil {
+		t.Fatal("Next() = nil, want the latest terminal size")
+	}
+	if sz.Width != 200 || sz.Height != 50 {
+		t.Errorf("Next() = %dx%d, want latest 200x50 (stale 80x24 must be dropped)", sz.Width, sz.Height)
+	}
+}
+
 // Write is the exec stdout/terminal-output path: its bytes must be emitted to
 // the peer as a single BINARY frame.
 func TestSession_WriteEmitsBinaryFrame(t *testing.T) {

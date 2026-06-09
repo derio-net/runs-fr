@@ -2,6 +2,7 @@ package runs
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -55,5 +56,65 @@ func TestListerList(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("List() = %#v\nwant %#v", got, want)
+	}
+}
+
+// anySelector is a placeholder list selector: Resolve ignores it and queries by
+// the exact fr.run/id label, so its value is irrelevant to these tests.
+func anySelector(t *testing.T) labels.Selector {
+	t.Helper()
+	sel, err := labels.Parse("fr.run/id")
+	if err != nil {
+		t.Fatalf("parse selector: %v", err)
+	}
+	return sel
+}
+
+func TestResolveNoMatchIsNotFound(t *testing.T) {
+	cs := fake.NewSimpleClientset(
+		runPod("pod-abc", "run-1", "gateway", "2", "feature", "codex", corev1.PodRunning),
+	)
+	l := NewLister(cs, "agents", anySelector(t))
+
+	_, err := l.Resolve(context.Background(), "run-absent")
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("Resolve(absent) error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestResolveSingleMatchReturnsPodName(t *testing.T) {
+	cs := fake.NewSimpleClientset(
+		runPod("pod-abc", "run-1", "gateway", "2", "feature", "codex", corev1.PodRunning),
+		// A different run must not be matched.
+		runPod("pod-zed", "run-2", "gateway", "5", "main", "claude", corev1.PodRunning),
+	)
+	l := NewLister(cs, "agents", anySelector(t))
+
+	got, err := l.Resolve(context.Background(), "run-1")
+	if err != nil {
+		t.Fatalf("Resolve(run-1) error = %v", err)
+	}
+	if got != "pod-abc" {
+		t.Errorf("Resolve(run-1) = %q, want %q", got, "pod-abc")
+	}
+}
+
+func TestResolveAmbiguousPicksLowestNameDeterministically(t *testing.T) {
+	// Two pods carry the same fr.run/id; Resolve must pick the lexicographically
+	// lowest name so repeated attaches land on the same pod regardless of list
+	// order returned by the API.
+	cs := fake.NewSimpleClientset(
+		runPod("pod-yyy", "run-dup", "gateway", "2", "feature", "codex", corev1.PodRunning),
+		runPod("pod-aaa", "run-dup", "gateway", "2", "feature", "codex", corev1.PodRunning),
+		runPod("pod-mmm", "run-dup", "gateway", "2", "feature", "codex", corev1.PodRunning),
+	)
+	l := NewLister(cs, "agents", anySelector(t))
+
+	got, err := l.Resolve(context.Background(), "run-dup")
+	if err != nil {
+		t.Fatalf("Resolve(run-dup) error = %v", err)
+	}
+	if got != "pod-aaa" {
+		t.Errorf("Resolve(run-dup) = %q, want lowest name %q", got, "pod-aaa")
 	}
 }

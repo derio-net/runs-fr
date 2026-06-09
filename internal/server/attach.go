@@ -89,7 +89,10 @@ func (s *server) handleAttach(w http.ResponseWriter, r *http.Request) {
 		defer stop()
 	}
 
-	// The exec target is the RESOLVED pod name, never the raw path segment.
+	// Attach blocks until the stream ends; that is fine here because this
+	// handler already owns a dedicated per-request goroutine — no extra
+	// goroutine + join is needed (the attacher runs its own ping loop). The
+	// exec target is the RESOLVED pod name, never the raw path segment.
 	if err := s.attacher.Attach(ctx, conn, podName, tmuxSessionName(id)); err != nil && ctx.Err() == nil {
 		s.log.Debug("attach ended", "id", id, "err", err)
 	}
