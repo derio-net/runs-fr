@@ -112,7 +112,14 @@ function attach(run: Run): void {
       term?.write(new Uint8Array(ev.data));
     }
   };
-  socket.onclose = () => setStatus(`Disconnected from ${run.id}.`);
+  socket.onclose = () => {
+    setStatus(`Disconnected from ${run.id}.`);
+    // The session is over: stop observing layout so the now-dead terminal
+    // stops re-fitting. The terminal stays mounted so its final output remains
+    // visible until another run is selected (which runs teardown()).
+    resizeObserver?.disconnect();
+    resizeObserver = null;
+  };
   socket.onerror = () => setStatus(`Connection error on ${run.id}.`);
 }
 
@@ -176,5 +183,9 @@ async function loadRuns(): Promise<void> {
   }
 }
 
+// A single module-global resize listener keeps the active terminal fitted. It
+// is intentionally not per-attach (unlike the ResizeObserver, which is torn
+// down per run): `fit` is null between and after sessions, so the optional-chain
+// guard makes this a safe no-op until a run is attached.
 window.addEventListener("resize", () => fit?.fit());
 void loadRuns();
