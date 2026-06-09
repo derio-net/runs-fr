@@ -24,10 +24,10 @@ image/chart installs into any cluster.
 
 **runs-fr performs NO authentication of its own.** It trusts a single request
 header (`AUTH_HEADER`, default `X-Forwarded-User`) to identify the
-authenticated user. The unauthenticated liveness/readiness probes (`/healthz`,
-`/readyz`) are the only routes reachable without that header; every `/api/*`
-route — including `GET /api/runs` and the `pods/exec` attach websocket — is
-gated behind it.
+authenticated user. The liveness/readiness probes (`/healthz`, `/readyz`) and
+the static frontend assets (`/`, `/bundle.js`, `/xterm.css`) are served without
+that header — they carry no run data. Every `/api/*` route — including
+`GET /api/runs` and the `pods/exec` attach websocket — is gated behind it.
 
 Because the gateway trusts that header, it **MUST sit behind a forward-auth
 proxy** (Authentik / oauth2-proxy / Traefik `forwardAuth`, etc.) that **SETS
@@ -139,5 +139,7 @@ curl localhost:8080/healthz        # -> ok
 ```
 
 Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml),
-which builds and pushes the image to `ghcr.io/derio-net/runs-fr`, tagged with
-both the pushed git tag and the commit SHA.
+which builds and pushes the image to `ghcr.io/derio-net/runs-fr` with three
+tags: the pushed git tag (e.g. `v0.1.0`), the bare semver version (`0.1.0`, so
+the chart's `appVersion`-derived default resolves), and the commit SHA
+(`sha-<short>`).

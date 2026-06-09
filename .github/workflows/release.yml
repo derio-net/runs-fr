@@ -32,8 +32,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/derio-net/runs-fr
+          # Three tags per release: the pushed git tag (v0.1.0), the bare
+          # semver version (0.1.0 — matches the chart's appVersion-derived
+          # default so `helm install` resolves a real image), and the commit
+          # SHA (sha-<short>) for exact-build pinning.
           tags: |
             type=ref,event=tag
+            type=semver,pattern={{version}}
             type=sha
 
       - name: Build and push
