@@ -127,7 +127,7 @@ func TestAttach_HandshakeAndPipe(t *testing.T) {
 	defer srv.Close()
 
 	conn := dialWS(t, srv, "/api/runs/run-1/attach")
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	typ, data, err := conn.Read(context.Background())
 	if err != nil {
@@ -174,7 +174,7 @@ func TestAttach_ContextCancelStopsAttacher(t *testing.T) {
 	defer srv.Close()
 
 	conn := dialWS(t, srv, "/api/runs/run-1/attach")
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Wait until the attacher is running before cancelling.
 	select {

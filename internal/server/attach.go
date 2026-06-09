@@ -78,7 +78,7 @@ func (s *server) handleAttach(w http.ResponseWriter, r *http.Request) {
 		s.log.Debug("websocket accept failed", "id", id, "err", err)
 		return
 	}
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 
 	// The exec stream lives until the request ends, the server shuts down, or
 	// the stream itself errors — whichever comes first.
