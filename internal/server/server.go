@@ -24,10 +24,13 @@ type RunLister interface {
 // server holds the dependencies shared across handlers. log is also carried by
 // the attach handler added in a later phase.
 type server struct {
-	cfg    *config.Config
-	log    *slog.Logger
-	ready  ReadyFunc
-	lister RunLister
+	cfg         *config.Config
+	log         *slog.Logger
+	ready       ReadyFunc
+	lister      RunLister
+	resolver    RunResolver
+	attacher    Attacher
+	shutdownCtx context.Context
 }
 
 // Option configures the server's injected dependencies.
@@ -79,6 +82,9 @@ func New(cfg *config.Config, opts ...Option) http.Handler {
 	apiMux := http.NewServeMux()
 	if s.lister != nil {
 		apiMux.HandleFunc("GET /api/runs", s.handleRuns)
+	}
+	if s.resolver != nil && s.attacher != nil {
+		apiMux.HandleFunc("GET /api/runs/{id}/attach", s.handleAttach)
 	}
 	mux.Handle("/api/", RequireForwardAuth(s.cfg.AuthHeader)(apiMux))
 
