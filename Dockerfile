@@ -37,6 +37,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 # ---- Final image --------------------------------------------------------------
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /out/runs-fr /runs-fr
-USER nonroot:nonroot
+# Numeric UID/GID (distroless `nonroot` = 65532) so a runAsNonRoot pod can be
+# verified by kubelet without a chart-side runAsUser override.
+USER 65532:65532
 EXPOSE 8080
 ENTRYPOINT ["/runs-fr"]
