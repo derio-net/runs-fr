@@ -34,6 +34,9 @@ state:
       ticked_at: null
       note: null
   completion:
-    at: null
-    note: null
+    at: '2026-06-12T04:44:52+00:00'
+    note: 'Verified in experiments vCluster (direct helm): /api/runs 403-without-header
+      + lists probe with header; ws attach echoed tmux. Bug caught+fixed (runAsNonRoot/non-numeric
+      USER) in runs-fr#19. Resources torn down; learnings captured for the staging-gate
+      brainstorm.'
     observed_prs: []
