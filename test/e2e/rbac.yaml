@@ -1,0 +1,33 @@
+# RBAC the smoke Job needs to self-provision its fixture run-pod in the staging vCluster.
+# The Frank staging-gate's run-smoke task applies this into the vCluster's smoke namespace and
+# launches the smoke Job with serviceAccountName: runs-fr-smoke. Namespace matches the contract's
+# smokeNamespace (runs-fr).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: runs-fr-smoke
+  namespace: runs-fr
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: runs-fr-smoke
+  namespace: runs-fr
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: runs-fr-smoke
+  namespace: runs-fr
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: runs-fr-smoke
+subjects:
+  - kind: ServiceAccount
+    name: runs-fr-smoke
+    namespace: runs-fr
