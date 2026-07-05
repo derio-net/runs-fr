@@ -1,0 +1,76 @@
+name: auto-tag
+
+# Ported from cnc-frd (CNC build-4b close-out): merging a version bump to
+# main tags and images it — no manual `git tag && git push` step while the
+# repo iterates quickly. runs-fr's canonical version is the chart's
+# appVersion (there is no VERSION file; "appVersion tracks the gateway
+# image" — Chart.yaml), so that is what this watches and parses.
+on:
+  push:
+    branches: [main]
+    paths: [charts/runs-fr/Chart.yaml]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create tag + release if absent
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          appver="$(sed -n 's/^appVersion: "\(.*\)"$/\1/p' charts/runs-fr/Chart.yaml)"
+          # Strict semver guard: the value flows into a git ref and image
+          # tags — a malformed Chart.yaml must fail loud, not mint junk.
+          # (Content is main-branch-only, so already maintainer-gated; this
+          # is shape validation, not trust repair.)
+          if ! printf '%s' "${appver}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "could not parse a semver appVersion from Chart.yaml (got: '${appver}')" >&2
+            exit 1
+          fi
+          version="v${appver}"
+          if git ls-remote --tags origin "refs/tags/${version}" | grep -q .; then
+            echo "tag ${version} exists — skipping (idempotent)"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${version}" -m "${version}"
+          git push origin "${version}"
+          gh release create "${version}" --generate-notes
+          echo "created=true" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      # Build + push the image HERE, in the same workflow: a tag pushed by the
+      # default GITHUB_TOKEN does NOT trigger release.yml's `push: tags`
+      # (GitHub's recursive-workflow guard). release.yml stays for manually
+      # pushed v* tags; both produce the same three image tags.
+      - uses: docker/metadata-action@v6
+        if: steps.tag.outputs.created == 'true'
+        id: meta
+        with:
+          images: ghcr.io/derio-net/runs-fr
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.tag.outputs.version }}
+            type=raw,value=${{ steps.tag.outputs.version }}
+            type=sha
+      - uses: docker/login-action@v4
+        if: steps.tag.outputs.created == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        if: steps.tag.outputs.created == 'true'
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
