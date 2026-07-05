@@ -2,6 +2,7 @@ package localterm
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"time"
 
@@ -50,7 +51,14 @@ func tmuxAttachCmd(socket, session string) *exec.Cmd {
 		args = append(args, "-S", socket)
 	}
 	args = append(args, "attach", "-t", "="+session)
-	return exec.Command("tmux", args...)
+	cmd := exec.Command("tmux", args...)
+	// The attach client refuses to start without a usable TERM ("open
+	// terminal failed: terminal does not support clear"), and the runner
+	// container carries none — force one deterministically. The browser
+	// peer is xterm.js, so xterm-256color is the honest value. Appended
+	// last: for duplicate keys, the last entry wins.
+	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	return cmd
 }
 
 // Attach satisfies the server's Attacher seam. The first argument is the
