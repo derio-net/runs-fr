@@ -106,7 +106,7 @@ func main() {
 	// Run the listener in the background so main can wait on the signal context.
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", cfg.Addr, "namespace", cfg.Namespace)
+		log.Info("listening", "addr", cfg.Addr, "backend", cfg.Backend, "namespace", cfg.Namespace)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 			return

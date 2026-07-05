@@ -7,17 +7,21 @@
 package localterm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/derio-net/runs-fr/internal/runs"
 )
 
-// tmuxRunner executes a tmux invocation and returns its combined output —
-// injectable so the lister/resolver logic is unit-testable without tmux.
+// tmuxRunner executes a tmux invocation, returning stdout and, on failure,
+// an error whose message carries stderr — injectable so the lister/resolver
+// logic is unit-testable without tmux. Session names are parsed from stdout
+// ONLY, so stderr chatter on a successful ls can't become phantom runs.
 type tmuxRunner func(ctx context.Context, args ...string) ([]byte, error)
 
 // Lister lists tmux sessions as Runs and resolves attach targets. The
@@ -39,11 +43,25 @@ func NewLister(socket, runnerName string) *Lister {
 	}
 }
 
-// execTmux shells out to tmux, combined output so "no server running" (which
-// tmux prints to stderr) is classifiable by the caller.
+// execTmux shells out to tmux with SPLIT streams: stdout is returned for
+// parsing; stderr rides the error message for classification ("no server
+// running" — stable, unlocalized in tmux ≥2.1; older tmux says "failed to
+// connect to server", which surfaces loudly as a 500).
 func execTmux(ctx context.Context, args ...string) ([]byte, error) {
-	return exec.CommandContext(ctx, "tmux", args...).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "tmux", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return stdout.Bytes(), fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.Bytes(), nil
 }
+
+// attachableName mirrors the attach route's id constraint
+// (server.validRunID, ^[a-z0-9-]+$): a session outside it would list as a
+// run whose attach always 400s — e.g. a human's debug session named "WORK".
+// Skip those instead of serving dead rows.
+var attachableName = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 // args prefixes the socket flag when configured.
 func (l *Lister) args(rest ...string) []string {
@@ -58,16 +76,18 @@ func (l *Lister) args(rest ...string) []string {
 func (l *Lister) List(ctx context.Context) ([]runs.Run, error) {
 	out, err := l.runTmux(ctx, l.args("ls", "-F", "#{session_name}")...)
 	if err != nil {
-		if strings.Contains(string(out), "no server running") {
+		// tmux exits its server with the last session; "no server running"
+		// is zero runs, not an error.
+		if strings.Contains(err.Error(), "no server running") {
 			return []runs.Run{}, nil
 		}
-		return nil, fmt.Errorf("localterm: tmux ls: %w (%s)", err, strings.TrimSpace(string(out)))
+		return nil, fmt.Errorf("localterm: tmux ls: %w", err)
 	}
 
 	var rs []runs.Run
 	for _, line := range strings.Split(string(out), "\n") {
 		name := strings.TrimSpace(line)
-		if name == "" {
+		if name == "" || !attachableName.MatchString(name) {
 			continue
 		}
 		rs = append(rs, runs.Run{ID: name, Status: "Running", Runner: l.runnerName})

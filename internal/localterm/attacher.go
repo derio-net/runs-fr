@@ -71,7 +71,6 @@ func (a *Attacher) attach(ctx context.Context, conn wsConn, session string) erro
 	// (ctx-bound) and closing the PTY unblocks its read; killing the client
 	// detaches tmux without touching the session itself.
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	// A blocked PTY read only wakes when the fd closes, so the teardown that
 	// unblocks the outbound pump must run on cancellation, not just on
 	// return (the return depends on that read waking — see the pump below).
@@ -80,7 +79,11 @@ func (a *Attacher) attach(ctx context.Context, conn wsConn, session string) erro
 		_ = ptmx.Close()
 		_ = cmd.Process.Kill()
 	}()
+	// Defer ORDER is load-bearing (LIFO; review finding 1): cancel must run
+	// BEFORE Wait, else a return path with a live client (e.g. ws write
+	// failure) blocks Wait on a process nothing will ever kill.
 	defer func() { _, _ = cmd.Process.Wait() }()
+	defer cancel()
 
 	// Inbound pump: browser → PTY. Binary frames are keystrokes; text frames
 	// are control (resize) — same demux-by-message-type rule as term.session.

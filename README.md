@@ -74,6 +74,12 @@ The **security contract is unchanged**: every `/api/*` route still trusts
 header MUST front the gateway — a reachable local-backend gateway is a
 read-write shell on every session it hosts.
 
+Concurrent attaches to one session are safe (each spawns its own `tmux
+attach` client; tmux multiplexes natively) — the usual tmux caveat applies:
+the last client's resize wins. Sessions whose names fall outside the attach
+route's `^[a-z0-9-]+$` (e.g. a human's `WORK` debug session) are omitted
+from `/api/runs` rather than listed unattachably.
+
 ## Install (Helm)
 
 The chart lives in [`charts/runs-fr`](charts/runs-fr). It defaults to a

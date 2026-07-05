@@ -110,10 +110,17 @@ func TestAttachEndsWhenCommandExits(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	start := time.Now()
 	if err := a.attach(ctx, conn, "s"); err != nil && !errors.Is(err, io.EOF) {
-		// A PTY read after child exit surfaces EIO — any non-hang return is
+		// A PTY read after child exit surfaces EIO — any prompt return is
 		// the contract; just ensure we got here.
 		t.Logf("attach returned: %v", err)
+	}
+	// A teardown regression that hangs until the ctx rescue would still
+	// "pass" without this bound (review minor 5) — the return must come
+	// from the child's exit, not the 5s timeout.
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("attach took %v — teardown is hanging until ctx rescue", elapsed)
 	}
 }
 

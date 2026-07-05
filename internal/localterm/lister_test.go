@@ -29,8 +29,9 @@ func (f *fakeTmux) run(_ context.Context, args ...string) ([]byte, error) {
 	return f.respond(args)
 }
 
-// errExit mimics tmux exiting nonzero: the lister must classify by output,
-// not by error type internals.
+// errExit mimics tmux exiting nonzero; with the split-stream contract,
+// stderr rides the error MESSAGE — the lister classifies on that, never on
+// stdout or error type internals.
 var errExit = errors.New("exit status 1")
 
 func TestListSortsAndTags(t *testing.T) {
@@ -60,7 +61,7 @@ func TestListNoServerIsEmpty(t *testing.T) {
 	// tmux exits 1 with "no server running on ..." when the last session has
 	// ended — that is zero runs, not an error.
 	ft := &fakeTmux{respond: func([]string) ([]byte, error) {
-		return []byte("no server running on /tmp/tmux-1000/default"), errExit
+		return nil, errors.New("exit status 1: no server running on /tmp/tmux-1000/default")
 	}}
 	l := NewLister("", "")
 	l.runTmux = ft.run
@@ -76,7 +77,7 @@ func TestListNoServerIsEmpty(t *testing.T) {
 
 func TestListRealErrorWrapped(t *testing.T) {
 	ft := &fakeTmux{respond: func([]string) ([]byte, error) {
-		return []byte("error connecting to /x (permission denied)"), errExit
+		return nil, errors.New("exit status 1: error connecting to /x (permission denied)")
 	}}
 	l := NewLister("", "")
 	l.runTmux = ft.run
@@ -125,9 +126,12 @@ func TestSocketFlagPrefixed(t *testing.T) {
 	}
 }
 
-func TestListSkipsBlankLines(t *testing.T) {
+func TestListSkipsBlankAndUnattachableNames(t *testing.T) {
+	// Names outside the attach route's ^[a-z0-9-]+$ (a human's WORK debug
+	// session, underscores) would list as rows whose attach always 400s —
+	// they are skipped, not served.
 	ft := &fakeTmux{respond: func([]string) ([]byte, error) {
-		return []byte(fmt.Sprintf("run-a\n\n%s\n", "")), nil
+		return []byte(fmt.Sprintf("run-a\n\nWORK\nmy_sess\n%s\n", "")), nil
 	}}
 	l := NewLister("", "")
 	l.runTmux = ft.run
