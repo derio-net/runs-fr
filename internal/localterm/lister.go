@@ -76,9 +76,13 @@ func (l *Lister) args(rest ...string) []string {
 func (l *Lister) List(ctx context.Context) ([]runs.Run, error) {
 	out, err := l.runTmux(ctx, l.args("ls", "-F", "#{session_name}")...)
 	if err != nil {
-		// tmux exits its server with the last session; "no server running"
-		// is zero runs, not an error.
-		if strings.Contains(err.Error(), "no server running") {
+		// Two zero-state shapes, both zero runs (not errors): "no server
+		// running" (a server ran and exited with its last session) and
+		// "error connecting ... (No such file or directory)" (no server has
+		// EVER run — no socket file yet; a fresh runner container).
+		msg := err.Error()
+		if strings.Contains(msg, "no server running") ||
+			(strings.Contains(msg, "error connecting") && strings.Contains(msg, "No such file or directory")) {
 			return []runs.Run{}, nil
 		}
 		return nil, fmt.Errorf("localterm: tmux ls: %w", err)

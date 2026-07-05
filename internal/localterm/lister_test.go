@@ -75,6 +75,27 @@ func TestListNoServerIsEmpty(t *testing.T) {
 	}
 }
 
+func TestListFreshSocketIsEmpty(t *testing.T) {
+	// A tmux server that has NEVER run leaves no socket file: tmux says
+	// "error connecting to <path> (No such file or directory)" — a third
+	// zero-state message, distinct from "no server running" (which needs a
+	// prior server). Caught live: a fresh runner container 500'd /api/runs
+	// until its first session existed.
+	ft := &fakeTmux{respond: func([]string) ([]byte, error) {
+		return nil, errors.New("exit status 1: error connecting to /tmp/tmux-65532/default (No such file or directory)")
+	}}
+	l := NewLister("", "")
+	l.runTmux = ft.run
+
+	got, err := l.List(context.Background())
+	if err != nil {
+		t.Fatalf("List() error = %v, want nil for fresh socket", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("List() = %v, want empty", got)
+	}
+}
+
 func TestListRealErrorWrapped(t *testing.T) {
 	ft := &fakeTmux{respond: func([]string) ([]byte, error) {
 		return nil, errors.New("exit status 1: error connecting to /x (permission denied)")
