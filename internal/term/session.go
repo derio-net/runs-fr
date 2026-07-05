@@ -30,6 +30,17 @@ type resizeEnvelope struct {
 	} `json:"resize"`
 }
 
+// ParseResize decodes a text control frame; ok reports whether it carried a
+// resize. Shared with the local backend so both attach paths speak one
+// control protocol.
+func ParseResize(data []byte) (cols, rows uint16, ok bool) {
+	var env resizeEnvelope
+	if err := json.Unmarshal(data, &env); err != nil || env.Resize == nil {
+		return 0, 0, false
+	}
+	return env.Resize.Cols, env.Resize.Rows, true
+}
+
 // session demuxes a single attach connection. It implements io.Reader (exec
 // stdin), io.Writer (exec stdout/terminal output), and
 // remotecommand.TerminalSizeQueue (resize events).
@@ -96,11 +107,11 @@ func (s *session) Read(p []byte) (int, error) {
 // new size onto the (capacity-1) channel, discarding any stale pending size so
 // the latest wins and the push never blocks.
 func (s *session) handleControl(data []byte) {
-	var env resizeEnvelope
-	if err := json.Unmarshal(data, &env); err != nil || env.Resize == nil {
+	cols, rows, ok := ParseResize(data)
+	if !ok {
 		return
 	}
-	sz := remotecommand.TerminalSize{Width: env.Resize.Cols, Height: env.Resize.Rows}
+	sz := remotecommand.TerminalSize{Width: cols, Height: rows}
 	select {
 	case s.sizes <- sz:
 	default:
