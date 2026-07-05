@@ -5,7 +5,7 @@ import "testing"
 func TestLoad(t *testing.T) {
 	// envVars not listed in a case's env map are cleared for that case via
 	// t.Setenv(key, ""), so defaults are exercised deterministically.
-	allKeys := []string{"ADDR", "NAMESPACE", "LABEL_SELECTOR", "AUTH_HEADER", "KUBECONFIG"}
+	allKeys := []string{"ADDR", "NAMESPACE", "LABEL_SELECTOR", "AUTH_HEADER", "KUBECONFIG", "BACKEND", "TMUX_SOCKET", "RUNNER_NAME"}
 
 	tests := []struct {
 		name    string
@@ -15,7 +15,7 @@ func TestLoad(t *testing.T) {
 	}{
 		{
 			name:    "namespace required",
-			env:     map[string]string{}, // NAMESPACE unset
+			env:     map[string]string{}, // NAMESPACE unset, BACKEND defaults kube
 			wantErr: true,
 		},
 		{
@@ -27,7 +27,39 @@ func TestLoad(t *testing.T) {
 				LabelSelector: "fr.run/id",
 				AuthHeader:    "X-Forwarded-User",
 				Kubeconfig:    "",
+				Backend:       "kube",
 			},
+		},
+		{
+			name: "local backend needs no namespace",
+			env:  map[string]string{"BACKEND": "local"},
+			want: Config{
+				Addr:          ":8080",
+				LabelSelector: "fr.run/id",
+				AuthHeader:    "X-Forwarded-User",
+				Backend:       "local",
+			},
+		},
+		{
+			name: "local backend loads tmux socket and runner name",
+			env: map[string]string{
+				"BACKEND":     "local",
+				"TMUX_SOCKET": "/run/tmux/cnc.sock",
+				"RUNNER_NAME": "default",
+			},
+			want: Config{
+				Addr:          ":8080",
+				LabelSelector: "fr.run/id",
+				AuthHeader:    "X-Forwarded-User",
+				Backend:       "local",
+				TmuxSocket:    "/run/tmux/cnc.sock",
+				RunnerName:    "default",
+			},
+		},
+		{
+			name:    "unknown backend rejected",
+			env:     map[string]string{"BACKEND": "docker", "NAMESPACE": "agents"},
+			wantErr: true,
 		},
 		{
 			name: "all overrides honored",
@@ -44,6 +76,7 @@ func TestLoad(t *testing.T) {
 				LabelSelector: "fr.run/owner",
 				AuthHeader:    "X-Auth-Request-User",
 				Kubeconfig:    "/home/user/.kube/config",
+				Backend:       "kube",
 			},
 		},
 	}

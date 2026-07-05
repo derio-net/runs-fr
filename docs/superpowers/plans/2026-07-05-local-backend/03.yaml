@@ -1,0 +1,57 @@
+schema_version: 2
+phase:
+  number: 3
+  title: 'localterm: PTY attacher (creack/pty) reusing the ws demux'
+  tag: agentic
+  depends_on:
+  - 2
+  tracking_issue: null
+tasks:
+- number: 1
+  title: extract resize-envelope parsing to a shared spot (refactor, stay green)
+  steps:
+  - id: P3.T1.S1
+    text: |
+      Move the `resizeEnvelope` parse into an exported helper
+      `term.ParseResize(data []byte) (cols, rows uint16, ok bool)` used
+      by term.session.handleControl; existing `go test ./internal/term/`
+      stays green (pure refactor, no behavior change).
+- number: 2
+  title: PTY attacher (TDD)
+  steps:
+  - id: P3.T2.S1
+    text: |
+      RED: `internal/localterm/attacher_test.go`: NewAttacher with an
+      injectable command factory; test factory returns
+      `exec.Command("cat")` (instead of tmux attach). Using a fake
+      wsConn-style pair: write binary "hello\n" inbound → outbound
+      binary frame contains "hello" (cat echo through the PTY); a text
+      frame `{"resize":{"cols":80,"rows":24}}` is consumed without
+      leaking into stdin; closing the ws side ends Attach without
+      hanging (t.Deadline guard). `go test ./internal/localterm/` → fail.
+  - id: P3.T2.S2
+    text: |
+      GREEN: implement `attacher.go`: default factory builds
+      `tmux [-S socket] attach -t =<session>`; `pty.Start(cmd)`; pump
+      goroutines: ws binary → pty write; pty read → ws binary; ws text →
+      ParseResize → `pty.Setsize`; first resize applied before/asap
+      after start; on ws error or pty EOF: kill process group + close.
+      Add `github.com/creack/pty` to go.mod. PASS with `-race`.
+state:
+  steps:
+    P3.T1.S1:
+      state: x
+      ticked_at: '2026-07-05T11:40:56+00:00'
+      note: null
+    P3.T2.S1:
+      state: x
+      ticked_at: '2026-07-05T11:40:57+00:00'
+      note: null
+    P3.T2.S2:
+      state: x
+      ticked_at: '2026-07-05T11:40:58+00:00'
+      note: null
+  completion:
+    at: '2026-07-05T11:40:59+00:00'
+    note: null
+    observed_prs: []

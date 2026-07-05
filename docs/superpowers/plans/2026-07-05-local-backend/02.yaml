@@ -1,0 +1,67 @@
+schema_version: 2
+phase:
+  number: 2
+  title: 'localterm: tmux-backed lister/resolver + Run.Runner field'
+  tag: agentic
+  depends_on:
+  - 1
+  tracking_issue: null
+tasks:
+- number: 1
+  title: 'runs: optional Runner field on Run (TDD)'
+  steps:
+  - id: P2.T1.S1
+    text: |
+      RED: add a JSON-shape test in `internal/runs/` asserting
+      `Run{ID:"x", Runner:"default"}` marshals with `"runner":"default"`
+      and that an empty Runner is omitted (`json:"runner,omitempty"`).
+      `fr isolation exec -- go test ./internal/runs/` → fail.
+  - id: P2.T1.S2
+    text: |
+      GREEN: add `Runner string \`json:"runner,omitempty"\`` to Run
+      (PodName likewise gains omitempty so local runs don't emit
+      `"podName":""` — adjust existing fixtures if they assert the old
+      shape). Tests PASS.
+- number: 2
+  title: localterm lister/resolver over injectable command runner (TDD)
+  steps:
+  - id: P2.T2.S1
+    text: |
+      RED: create `internal/localterm/lister_test.go`: a Lister built
+      with a fake `runTmux func(ctx, args ...string) ([]byte, error)`.
+      Cases: (a) `ls -F #{session_name}` output "run-b\nrun-a\n" → two
+      Runs sorted by ID, Status "Running", Runner from cfg;
+      (b) tmux "no server running" (exit 1, stderr contains "no server")
+      → empty list, nil error; (c) other error → wrapped error;
+      (d) Resolve("run-a") uses `has-session -t =run-a`, exit 0 → id
+      returned; exit 1 → runs.ErrNotFound; (e) TMUX_SOCKET set →
+      args begin `-S <socket>`. `go test ./internal/localterm/` → fail.
+  - id: P2.T2.S2
+    text: |
+      GREEN: implement `internal/localterm/lister.go`: NewLister(socket,
+      runnerName string) with the real runner shelling `tmux` via
+      os/exec (context-bound); parse/classify as above. Resolve returns
+      the session name itself as the "pod" handle (the attacher ignores
+      it). PASS + `fr isolation exec -- make lint`.
+state:
+  steps:
+    P2.T1.S1:
+      state: x
+      ticked_at: '2026-07-05T11:37:29+00:00'
+      note: null
+    P2.T1.S2:
+      state: x
+      ticked_at: '2026-07-05T11:37:30+00:00'
+      note: null
+    P2.T2.S1:
+      state: x
+      ticked_at: '2026-07-05T11:37:31+00:00'
+      note: null
+    P2.T2.S2:
+      state: x
+      ticked_at: '2026-07-05T11:37:32+00:00'
+      note: null
+  completion:
+    at: '2026-07-05T11:37:33+00:00'
+    note: null
+    observed_prs: []

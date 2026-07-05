@@ -1,0 +1,56 @@
+schema_version: 2
+phase:
+  number: 4
+  title: Wiring, readiness, docs, v0.2.0
+  tag: agentic
+  depends_on:
+  - 3
+  tracking_issue: null
+tasks:
+- number: 1
+  title: main.go backend switch + local readiness (TDD where testable)
+  steps:
+  - id: P4.T1.S1
+    text: |
+      RED: server-level test asserting a local-backend server (lister +
+      attacher injected as the localterm pair) serves GET /api/runs with
+      the forward-auth gate exactly as the kube path (reuse existing
+      server tests' harness with a localterm fake). → fail until wired.
+  - id: P4.T1.S2
+    text: |
+      GREEN: cmd/runs-fr main: cfg.Backend=="local" → localterm lister
+      (socket, runnerName) as RunLister+RunResolver, localterm attacher;
+      readiness = exec.LookPath("tmux") (no tmux server ≠ unready — zero
+      sessions is a valid state); kube path untouched.
+      `fr isolation exec -- make frontend && make test && make lint` → PASS.
+- number: 2
+  title: README + chart appVersion
+  steps:
+  - id: P4.T2.S1
+    text: |
+      README: "Local backend (tmux)" section — env table rows for
+      BACKEND/TMUX_SOCKET/RUNNER_NAME, the unchanged security contract
+      (forward-auth proxy still mandatory), and the CNC laptop-compose
+      consumer note. charts/runs-fr/Chart.yaml appVersion → 0.2.0
+      (chart itself stays k8s-only; no chart templating changes).
+      Verify: `fr isolation exec -- make test` green; push branch on the
+      HOST (`cd <worktree> && git push -u origin feat/local-backend`) —
+      NO PR (fr-goal step 8 owns delivery).
+state:
+  steps:
+    P4.T1.S1:
+      state: x
+      ticked_at: '2026-07-05T11:44:02+00:00'
+      note: null
+    P4.T1.S2:
+      state: x
+      ticked_at: '2026-07-05T11:44:03+00:00'
+      note: null
+    P4.T2.S1:
+      state: x
+      ticked_at: '2026-07-05T11:44:05+00:00'
+      note: null
+  completion:
+    at: '2026-07-05T11:44:06+00:00'
+    note: null
+    observed_prs: []

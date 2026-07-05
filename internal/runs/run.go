@@ -11,5 +11,8 @@ type Run struct {
 	Branch  string `json:"branch"`
 	Harness string `json:"harness"`
 	Status  string `json:"status"`
-	PodName string `json:"podName"`
+	PodName string `json:"podName,omitempty"`
+	// Runner names the gateway serving this run (RUNNER_NAME); set by the
+	// local backend so aggregated multi-runner lists stay distinguishable.
+	Runner string `json:"runner,omitempty"`
 }
