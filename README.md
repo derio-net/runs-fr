@@ -50,11 +50,29 @@ All configuration is via environment variables (read at startup by
 
 | Env var          | Default            | Required | Description                                                                 |
 | ---------------- | ------------------ | -------- | --------------------------------------------------------------------------- |
-| `NAMESPACE`      | —                  | **yes**  | Kubernetes namespace to watch for run pods (the `pods/exec` scope).         |
+| `BACKEND`        | `kube`             | no       | Attach backend: `kube` (pods/exec) or `local` (tmux on the gateway's host). |
+| `NAMESPACE`      | —                  | kube only | Kubernetes namespace to watch for run pods (the `pods/exec` scope).        |
 | `ADDR`           | `:8080`            | no       | Listen address.                                                             |
-| `LABEL_SELECTOR` | `fr.run/id`        | no       | Label selector identifying run pods.                                        |
+| `LABEL_SELECTOR` | `fr.run/id`        | no       | Label selector identifying run pods (kube backend).                         |
 | `AUTH_HEADER`    | `X-Forwarded-User` | no       | Trusted header carrying the authenticated user (set by the proxy).          |
 | `KUBECONFIG`     | _(in-cluster)_     | no       | Path to a kubeconfig file; empty uses the in-cluster ServiceAccount config. |
+| `TMUX_SOCKET`    | _(tmux default)_   | no       | Explicit tmux socket path (`tmux -S`) — local backend.                      |
+| `RUNNER_NAME`    | _(empty)_          | no       | Tags served runs (`"runner"` field) — local backend, for aggregated multi-runner lists. |
+
+### Local backend (tmux)
+
+`BACKEND=local` serves the tmux sessions of the gateway's **own host** as
+runs: `GET /api/runs` lists `tmux ls` (one Run per session, `id` = session
+name, sparse metadata), and the attach route bridges `tmux attach -t =<id>`
+over a local PTY to the same binary/`{"resize":…}` websocket protocol. No
+cluster, no Docker socket — the intended shape is a runner container that
+bundles this gateway, tmux, and whatever creates the sessions (e.g. CNC's
+`cnc-runner` wake receiver, which names each session after its run id).
+
+The **security contract is unchanged**: every `/api/*` route still trusts
+`AUTH_HEADER` alone, so a forward-auth proxy that sets-and-overwrites the
+header MUST front the gateway — a reachable local-backend gateway is a
+read-write shell on every session it hosts.
 
 ## Install (Helm)
 

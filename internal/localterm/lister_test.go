@@ -29,9 +29,9 @@ func (f *fakeTmux) run(_ context.Context, args ...string) ([]byte, error) {
 	return f.respond(args)
 }
 
-// exitErr mimics tmux exiting nonzero: the lister must classify by output,
+// errExit mimics tmux exiting nonzero: the lister must classify by output,
 // not by error type internals.
-var exitErr = errors.New("exit status 1")
+var errExit = errors.New("exit status 1")
 
 func TestListSortsAndTags(t *testing.T) {
 	ft := &fakeTmux{respond: func(args []string) ([]byte, error) {
@@ -60,7 +60,7 @@ func TestListNoServerIsEmpty(t *testing.T) {
 	// tmux exits 1 with "no server running on ..." when the last session has
 	// ended — that is zero runs, not an error.
 	ft := &fakeTmux{respond: func([]string) ([]byte, error) {
-		return []byte("no server running on /tmp/tmux-1000/default"), exitErr
+		return []byte("no server running on /tmp/tmux-1000/default"), errExit
 	}}
 	l := NewLister("", "")
 	l.runTmux = ft.run
@@ -76,7 +76,7 @@ func TestListNoServerIsEmpty(t *testing.T) {
 
 func TestListRealErrorWrapped(t *testing.T) {
 	ft := &fakeTmux{respond: func([]string) ([]byte, error) {
-		return []byte("error connecting to /x (permission denied)"), exitErr
+		return []byte("error connecting to /x (permission denied)"), errExit
 	}}
 	l := NewLister("", "")
 	l.runTmux = ft.run
@@ -91,7 +91,7 @@ func TestResolveExactMatch(t *testing.T) {
 		if args[0] == "has-session" && args[2] == "=run-a" {
 			return nil, nil
 		}
-		return []byte("can't find session"), exitErr
+		return []byte("can't find session"), errExit
 	}}
 	l := NewLister("", "")
 	l.runTmux = ft.run
