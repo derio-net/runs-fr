@@ -132,6 +132,13 @@ func TestDefaultCommandShape(t *testing.T) {
 	if got != want {
 		t.Errorf("default cmd = %q, want %q", got, want)
 	}
+	// The attach client dies without a TERM ("open terminal failed:
+	// terminal does not support clear") — the runner container has none,
+	// which killed every local attach on the first live seam run. The
+	// default cmd must force one deterministically (last entry wins).
+	if len(cmd.Env) == 0 || cmd.Env[len(cmd.Env)-1] != "TERM=xterm-256color" {
+		t.Errorf("default cmd env must end with TERM=xterm-256color; env tail = %v", cmd.Env)
+	}
 
 	bare := NewAttacher("")
 	if got := strings.Join(bare.newCmd("", "run-2").Args, " "); got != "tmux attach -t =run-2" {
