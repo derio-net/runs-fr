@@ -8,6 +8,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/derio-net/runs-fr/internal/config"
 	"github.com/derio-net/runs-fr/internal/runs"
@@ -33,6 +35,13 @@ type server struct {
 	attacher    Attacher
 	shutdownCtx context.Context
 	static      fs.FS
+	tokens      map[string]nodeToken
+	tokensMu    sync.Mutex
+}
+
+type nodeToken struct {
+	node, user string
+	expires    time.Time
 }
 
 // Option configures the server's injected dependencies.
@@ -56,9 +65,10 @@ func WithLister(l RunLister) Option {
 // attach route is added in a later phase.
 func New(cfg *config.Config, opts ...Option) http.Handler {
 	s := &server{
-		cfg:   cfg,
-		log:   slog.Default(),
-		ready: func(context.Context) error { return nil },
+		cfg:    cfg,
+		log:    slog.Default(),
+		ready:  func(context.Context) error { return nil },
+		tokens: make(map[string]nodeToken),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -93,6 +103,7 @@ func New(cfg *config.Config, opts ...Option) http.Handler {
 	if s.resolver != nil && s.attacher != nil {
 		apiMux.HandleFunc("GET /api/runs/{id}/attach", s.handleAttach)
 	}
+	apiMux.HandleFunc("POST /api/nodes/{name}/attach-token", s.handleNodeToken)
 	mux.Handle("/api/", RequireForwardAuth(s.cfg.AuthHeader)(apiMux))
 
 	return mux
@@ -127,6 +138,15 @@ func (s *server) handleRuns(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("list runs", "err", err)
 		http.Error(w, "failed to list runs", http.StatusInternalServerError)
 		return
+	}
+	if r.Header.Get("X-Forwarded-Role") != "owner" {
+		filtered := rs[:0]
+		for _, run := range rs {
+			if run.Kind != "node" {
+				filtered = append(filtered, run)
+			}
+		}
+		rs = filtered
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(rs); err != nil {

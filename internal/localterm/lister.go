@@ -62,6 +62,14 @@ func execTmux(ctx context.Context, args ...string) ([]byte, error) {
 // run whose attach always 400s — e.g. a human's debug session named "WORK".
 // Skip those instead of serving dead rows.
 var attachableName = regexp.MustCompile(`^[a-z0-9-]+$`)
+var nodeSessionName = regexp.MustCompile(`^node:([a-z0-9-]+)$`)
+
+func classifySession(name string) (kind, nodeName string, ok bool) {
+	if m := nodeSessionName.FindStringSubmatch(name); m != nil {
+		return "node", m[1], true
+	}
+	return "", "", attachableName.MatchString(name)
+}
 
 // args prefixes the socket flag when configured.
 func (l *Lister) args(rest ...string) []string {
@@ -91,10 +99,11 @@ func (l *Lister) List(ctx context.Context) ([]runs.Run, error) {
 	var rs []runs.Run
 	for _, line := range strings.Split(string(out), "\n") {
 		name := strings.TrimSpace(line)
-		if name == "" || !attachableName.MatchString(name) {
+		kind, nodeName, ok := classifySession(name)
+		if name == "" || !ok {
 			continue
 		}
-		rs = append(rs, runs.Run{ID: name, Status: "Running", Runner: l.runnerName})
+		rs = append(rs, runs.Run{ID: name, Status: "Running", Runner: l.runnerName, Kind: kind, NodeName: nodeName})
 	}
 	sort.Slice(rs, func(i, j int) bool { return rs[i].ID < rs[j].ID })
 	if rs == nil {
@@ -107,6 +116,9 @@ func (l *Lister) List(ctx context.Context) ([]runs.Run, error) {
 // name itself as the attach handle (the local attacher targets sessions, not
 // pods). The "=" prefix forces tmux's exact-match semantics.
 func (l *Lister) Resolve(ctx context.Context, id string) (string, error) {
+	if _, _, ok := classifySession(id); !ok {
+		return "", runs.ErrNotFound
+	}
 	if _, err := l.runTmux(ctx, l.args("has-session", "-t", "="+id)...); err != nil {
 		return "", runs.ErrNotFound
 	}

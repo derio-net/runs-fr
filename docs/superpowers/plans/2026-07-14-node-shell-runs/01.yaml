@@ -1,0 +1,24 @@
+schema_version: 2
+phase:
+  number: 1
+  title: Classify node sessions (TDD)
+  tag: agentic
+  depends_on: []
+  tracking_issue: null
+  acceptance: [node-interactive-shell]
+tasks:
+  - number: 1
+    title: Session listing and resolution
+    steps:
+      - id: P1.T1.S1
+        text: 'RED: test node:<name> classification, run session classification, deterministic sorting, and exact resolution for both kinds.'
+      - id: P1.T1.S2
+        text: 'GREEN: extend the local lister/resolver and run model with explicit node metadata without allowing node sessions to become runs.'
+      - id: P1.T1.S3
+        text: 'REFACTOR: keep prefix parsing and attach target construction centralized.'
+state:
+  steps:
+    P1.T1.S1: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P1.T1.S2: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P1.T1.S3: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+  completion: {at: '2026-07-14T22:00:00Z', note: 'implemented and reviewed', observed_prs: []}

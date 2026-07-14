@@ -1,0 +1,24 @@
+schema_version: 2
+phase:
+  number: 2
+  title: Attach lifecycle and boundary hardening
+  tag: agentic
+  depends_on: [1]
+  tracking_issue: null
+  acceptance: [node-interactive-shell, node-shell-owner-only]
+tasks:
+  - number: 1
+    title: Reconnect and lifecycle safety
+    steps:
+      - id: P2.T1.S1
+        text: 'RED: test node attach reconnect, vanished-session behavior, shutdown cancellation, and multi-node exact-target behavior.'
+      - id: P2.T1.S2
+        text: 'GREEN: harden attach resolution and websocket lifecycle for persistent node shells while retaining server-side identity/CSRF gates.'
+      - id: P2.T1.S3
+        text: 'REFACTOR: run the complete Go suite and integration tests.'
+state:
+  steps:
+    P2.T1.S1: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P2.T1.S2: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P2.T1.S3: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+  completion: {at: '2026-07-14T22:00:00Z', note: 'implemented and reviewed', observed_prs: []}

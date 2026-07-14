@@ -15,7 +15,7 @@ import (
 // attach endpoint: only ids matching this pattern are ever used to resolve a
 // pod or derive a tmux session name, so a hostile segment can never be
 // interpolated into a Kubernetes request.
-var validRunID = regexp.MustCompile(`^[a-z0-9-]+$`)
+var validRunID = regexp.MustCompile(`^(?:[a-z0-9-]+|node:[a-z0-9-]+)$`)
 
 // RunResolver maps a validated run id to the name of the live pod backing it.
 type RunResolver interface {
@@ -58,6 +58,14 @@ func (s *server) handleAttach(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !validRunID.MatchString(id) {
 		http.Error(w, "invalid run id", http.StatusBadRequest)
+		return
+	}
+	if len(id) >= len("node:") && id[:len("node:")] == "node:" && r.Header.Get("X-Forwarded-Role") != "owner" {
+		http.Error(w, "node shell requires owner role", http.StatusForbidden)
+		return
+	}
+	if len(id) >= len("node:") && id[:len("node:")] == "node:" && !s.consumeNodeToken(r.URL.Query().Get("token"), id[len("node:"):], r.Header.Get(s.cfg.AuthHeader)) {
+		http.Error(w, "invalid or expired node attach token", http.StatusForbidden)
 		return
 	}
 

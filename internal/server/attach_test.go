@@ -85,6 +85,17 @@ func TestAttach_InvalidID400(t *testing.T) {
 	}
 }
 
+func TestAttach_NodeRequiresOwner(t *testing.T) {
+	h := New(testConfig(), WithAttach(&stubResolver{pod: "p"}, newStubAttacher()))
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/node%3Adefault/attach", nil)
+	req.Header.Set(authTestHeader, "tester")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
 // (b) A valid id that matches no run pod is rejected with 404 before any upgrade.
 func TestAttach_NoMatchingPod404(t *testing.T) {
 	h := New(testConfig(), WithAttach(&stubResolver{notFound: true}, newStubAttacher()))
