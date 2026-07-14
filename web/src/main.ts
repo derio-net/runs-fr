@@ -33,6 +33,12 @@ let term: Terminal | null = null;
 let fit: FitAddon | null = null;
 let ws: WebSocket | null = null;
 let resizeObserver: ResizeObserver | null = null;
+let selectedRun: Run | null = null;
+let attachGeneration = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempt = 0;
+
+const maxReconnectAttempts = 12;
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
@@ -48,6 +54,13 @@ function attachURL(id: string): string {
 // teardown disposes the current terminal and closes the socket so selecting a
 // different run never leaks a terminal, socket, or observer.
 function teardown(): void {
+  attachGeneration++;
+  selectedRun = null;
+  reconnectAttempt = 0;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   resizeObserver?.disconnect();
   resizeObserver = null;
   if (ws) {
@@ -72,8 +85,63 @@ function sendResize(): void {
   ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
 }
 
+function openSocket(run: Run, generation: number): void {
+  if (generation !== attachGeneration || selectedRun !== run) {
+    return;
+  }
+
+  const socket = new WebSocket(attachURL(run.id));
+  socket.binaryType = "arraybuffer";
+  ws = socket;
+
+  socket.onopen = () => {
+    if (generation !== attachGeneration || ws !== socket) {
+      socket.close();
+      return;
+    }
+    reconnectAttempt = 0;
+    setStatus(`Attached to ${run.id} (${run.podName})`);
+    // Send the geometry the terminal already settled on before the socket
+    // opened, then keep it focused for input.
+    sendResize();
+    term?.focus();
+  };
+  // Server output arrives as binary frames; write the raw bytes to the terminal.
+  socket.onmessage = (ev: MessageEvent) => {
+    if (generation === attachGeneration && ev.data instanceof ArrayBuffer) {
+      term?.write(new Uint8Array(ev.data));
+    }
+  };
+  socket.onclose = () => {
+    if (generation !== attachGeneration || ws !== socket || selectedRun !== run) {
+      return;
+    }
+    ws = null;
+    if (reconnectAttempt >= maxReconnectAttempts) {
+      setStatus(`Disconnected from ${run.id}.`);
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      return;
+    }
+    const delay = Math.min(5000, 250 * 2 ** reconnectAttempt);
+    reconnectAttempt++;
+    setStatus(`Disconnected from ${run.id}; reconnecting…`);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      openSocket(run, generation);
+    }, delay);
+  };
+  socket.onerror = () => {
+    if (generation === attachGeneration && ws === socket) {
+      setStatus(`Connection error on ${run.id}; reconnecting…`);
+    }
+  };
+}
+
 function attach(run: Run): void {
   teardown();
+  selectedRun = run;
+  const generation = attachGeneration;
   setStatus(`Attaching to ${run.id}…`);
 
   term = new Terminal({ convertEol: false, cursorBlink: true, fontSize: 13 });
@@ -95,32 +163,7 @@ function attach(run: Run): void {
   resizeObserver = new ResizeObserver(() => fit?.fit());
   resizeObserver.observe(terminalEl);
 
-  const socket = new WebSocket(attachURL(run.id));
-  socket.binaryType = "arraybuffer";
-  ws = socket;
-
-  socket.onopen = () => {
-    setStatus(`Attached to ${run.id} (${run.podName})`);
-    // Send the geometry the terminal already settled on before the socket
-    // opened, then keep it focused for input.
-    sendResize();
-    term?.focus();
-  };
-  // Server output arrives as binary frames; write the raw bytes to the terminal.
-  socket.onmessage = (ev: MessageEvent) => {
-    if (ev.data instanceof ArrayBuffer) {
-      term?.write(new Uint8Array(ev.data));
-    }
-  };
-  socket.onclose = () => {
-    setStatus(`Disconnected from ${run.id}.`);
-    // The session is over: stop observing layout so the now-dead terminal
-    // stops re-fitting. The terminal stays mounted so its final output remains
-    // visible until another run is selected (which runs teardown()).
-    resizeObserver?.disconnect();
-    resizeObserver = null;
-  };
-  socket.onerror = () => setStatus(`Connection error on ${run.id}.`);
+  openSocket(run, generation);
 }
 
 function renderRuns(runs: Run[]): void {
