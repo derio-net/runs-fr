@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -109,6 +110,21 @@ func TestAttachUsesExecutorAndSession(t *testing.T) {
 	a.newExecutor = func(_ *rest.Config, u *url.URL) (remotecommand.Executor, error) {
 		if got, want := u.Path, "/api/v1/namespaces/agents/pods/node-pod/exec"; got != want {
 			t.Errorf("exec path = %q, want %q", got, want)
+		}
+		// Assert the exec QUERY, not just the path: the command must attach the
+		// resolved session by exact "=" match, and request a TTY with stdin/stdout.
+		q := u.Query()
+		if got, want := q["command"], []string{"tmux", "attach", "-t", "=run-1"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("exec command = %v, want %v", got, want)
+		}
+		if got := q.Get("tty"); got != "true" {
+			t.Errorf("exec tty = %q, want true", got)
+		}
+		if got := q.Get("stdin"); got != "true" {
+			t.Errorf("exec stdin = %q, want true", got)
+		}
+		if got := q.Get("stdout"); got != "true" {
+			t.Errorf("exec stdout = %q, want true", got)
 		}
 		return &fakeExecutor{stream: func(ctx context.Context, options remotecommand.StreamOptions) error {
 			started <- options

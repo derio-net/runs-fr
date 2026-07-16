@@ -16,6 +16,12 @@ import (
 // pod's tmux session, so stdin/stdout and a TTY are requested; under a TTY
 // stderr is multiplexed onto stdout and is left unset.
 //
+// The attach target carries the "=" exact-match prefix, matching the local
+// backend (localterm.tmuxAttachCmd) so both backends resolve a session by an
+// exact name rather than tmux's default prefix match — a node-<name> shell
+// (colon-free per the naming correction) can never be shadowed by a longer
+// session that shares its prefix.
+//
 // The .Post() builder is used only to assemble the URL — the HTTP method is
 // supplied per-executor (websocket upgrades with GET, SPDY with POST), so this
 // returns a bare URL, not a request.
@@ -27,7 +33,7 @@ func BuildExecURL(clientset kubernetes.Interface, namespace, pod, sessionName st
 		Name(pod).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
-			Command: []string{"tmux", "attach", "-t", sessionName},
+			Command: []string{"tmux", "attach", "-t", "=" + sessionName},
 			Stdin:   true,
 			Stdout:  true,
 			Stderr:  false,

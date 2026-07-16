@@ -30,7 +30,8 @@ func TestBuildExecURL(t *testing.T) {
 	}
 
 	q := u.Query()
-	if got, want := q["command"], []string{"tmux", "attach", "-t", "fr-run-abc"}; !reflect.DeepEqual(got, want) {
+	// The target carries the "=" exact-match prefix, matching the local backend.
+	if got, want := q["command"], []string{"tmux", "attach", "-t", "=fr-run-abc"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("command = %v, want %v", got, want)
 	}
 	if got := q.Get("tty"); got != "true" {
@@ -46,5 +47,19 @@ func TestBuildExecURL(t *testing.T) {
 	// requested (the field is omitempty, so false means absent).
 	if got := q.Get("stderr"); got == "true" {
 		t.Errorf("stderr = %q, want it not requested under a TTY", got)
+	}
+}
+
+// A node-<name> shell (colon-free per the naming correction) resolves through
+// the kube backend with the same "=" exact-match prefix the local backend uses,
+// so the two attach planes target sessions identically.
+func TestBuildExecURLNodeSessionExactMatch(t *testing.T) {
+	cs := testClientset(t)
+
+	u := BuildExecURL(cs, "agents", "node-pod", "node-default")
+
+	q := u.Query()
+	if got, want := q["command"], []string{"tmux", "attach", "-t", "=node-default"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("command = %v, want %v", got, want)
 	}
 }
