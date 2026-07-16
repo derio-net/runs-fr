@@ -1,0 +1,39 @@
+schema_version: 2
+phase:
+  number: 2
+  title: Attach lifecycle and boundary hardening
+  tag: agentic
+  depends_on: [1]
+  tracking_issue: null
+  acceptance: [node-interactive-shell, node-shell-owner-only]
+tasks:
+  - number: 1
+    title: Reconnect and lifecycle safety
+    steps:
+      - id: P2.T1.S1
+        text: 'RED: test node attach reconnect, vanished-session behavior, shutdown cancellation, and multi-node exact-target behavior.'
+      - id: P2.T1.S2
+        text: 'GREEN: harden attach resolution and websocket lifecycle for persistent node shells while retaining server-side identity/CSRF gates.'
+      - id: P2.T1.S3
+        text: 'REFACTOR: run the complete Go suite and integration tests.'
+  - number: 2
+    title: Attach-token boundary tests (backfilled — were ticked but absent)
+    steps:
+      - id: P2.T2.S1
+        text: 'Single-use: an owner-bound token is consumed exactly once; a second (replay) consume is refused (TestNodeAttachTokenSingleUse + TestAttach_NodeOwnerWithoutTokenRefused).'
+      - id: P2.T2.S2
+        text: 'Happy path: owner role + valid token attaches node-<name>, handing the node session name to the attacher (TestAttach_NodeHappyPathWithOwnerAndToken).'
+      - id: P2.T2.S3
+        text: 'Cross-node + user replay refused, and the refused attempt still consumes the token; expired tokens GC on mint (TestNodeAttachTokenCrossNodeReplayRefused/UserBound/MintSweepsExpired).'
+      - id: P2.T2.S4
+        text: 'Role header is configurable (AUTH_ROLE_HEADER / chart authRoleHeader) and documented as proxy-overwritten, not client-trusted.'
+state:
+  steps:
+    P2.T1.S1: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P2.T1.S2: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P2.T1.S3: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P2.T2.S1: {state: x, ticked_at: '2026-07-16T00:00:00Z', note: 'backfilled: prior TestNodeAttachTokenIsOwnerBoundAndSingleUse never tested single-use'}
+    P2.T2.S2: {state: x, ticked_at: '2026-07-16T00:00:00Z', note: 'backfilled: no happy-path attach existed'}
+    P2.T2.S3: {state: x, ticked_at: '2026-07-16T00:00:00Z', note: 'backfilled: cross-node replay + token-map GC'}
+    P2.T2.S4: {state: x, ticked_at: '2026-07-16T00:00:00Z', note: 'X-Forwarded-Role was hardcoded + inert; now configurable + documented'}
+  completion: {at: '2026-07-16T00:00:00Z', note: 'boundary-hardening backfilled after adversarial review: node- naming, reserved prefix, configurable role header, real token single-use/replay/GC tests', observed_prs: []}

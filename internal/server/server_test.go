@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,10 +12,11 @@ import (
 
 func testConfig() *config.Config {
 	return &config.Config{
-		Addr:          ":8080",
-		Namespace:     "agents",
-		LabelSelector: "fr.run/id",
-		AuthHeader:    "X-Forwarded-User",
+		Addr:           ":8080",
+		Namespace:      "agents",
+		LabelSelector:  "fr.run/id",
+		AuthHeader:     "X-Forwarded-User",
+		AuthRoleHeader: "X-Forwarded-Role",
 	}
 }
 
@@ -78,5 +80,35 @@ func TestAPIGated(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("GET /api/runs (no auth header) status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestNodeAttachTokenIsOwnerBoundAndSingleUse(t *testing.T) {
+	h := New(testConfig())
+	denied := httptest.NewRequest(http.MethodPost, "/api/nodes/default/attach-token", nil)
+	denied.Header.Set(authTestHeader, "observer")
+	denied.Header.Set("X-Forwarded-Role", "observer")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, denied)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("non-owner token status = %d", rec.Code)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/nodes/default/attach-token", nil)
+	req.Header.Set(authTestHeader, "owner")
+	req.Header.Set("X-Forwarded-Role", "owner")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("owner token status = %d", rec.Code)
+	}
+	var body struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil || body.Token == "" {
+		t.Fatalf("token response = %q, err=%v", rec.Body.String(), err)
+	}
+	if len(body.Token) != 64 {
+		t.Fatalf("token length = %d, want 64 hex chars", len(body.Token))
 	}
 }

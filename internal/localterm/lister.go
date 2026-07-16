@@ -57,11 +57,34 @@ func execTmux(ctx context.Context, args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+// nodePrefix is RESERVED for node login shells. A node session is
+// `node-<name>` (colon-free — tmux treats ":" as its session:window separator,
+// so `new-session -s node:default` silently becomes `node_default` and
+// `has-session -t "=node:default"` errors; see the spec's naming correction).
+// Because run ids share the same `[a-z0-9-]` charset, the classifier reserves
+// this literal prefix: any `node-*` session is a node shell (owner-gated), so
+// no run id can masquerade as one, and a malformed `node-*` is attachable as
+// neither (skipped) rather than leaking as a freely-attachable run.
+const nodePrefix = "node-"
+
 // attachableName mirrors the attach route's id constraint
 // (server.validRunID, ^[a-z0-9-]+$): a session outside it would list as a
 // run whose attach always 400s — e.g. a human's debug session named "WORK".
 // Skip those instead of serving dead rows.
 var attachableName = regexp.MustCompile(`^[a-z0-9-]+$`)
+var nodeSessionName = regexp.MustCompile(`^node-([a-z0-9-]+)$`)
+
+func classifySession(name string) (kind, nodeName string, ok bool) {
+	if strings.HasPrefix(name, nodePrefix) {
+		// Reserved prefix: only a well-formed node-<name> is attachable, and
+		// always as a node shell — never as a run.
+		if m := nodeSessionName.FindStringSubmatch(name); m != nil {
+			return "node", m[1], true
+		}
+		return "", "", false
+	}
+	return "", "", attachableName.MatchString(name)
+}
 
 // args prefixes the socket flag when configured.
 func (l *Lister) args(rest ...string) []string {
@@ -91,10 +114,11 @@ func (l *Lister) List(ctx context.Context) ([]runs.Run, error) {
 	var rs []runs.Run
 	for _, line := range strings.Split(string(out), "\n") {
 		name := strings.TrimSpace(line)
-		if name == "" || !attachableName.MatchString(name) {
+		kind, nodeName, ok := classifySession(name)
+		if name == "" || !ok {
 			continue
 		}
-		rs = append(rs, runs.Run{ID: name, Status: "Running", Runner: l.runnerName})
+		rs = append(rs, runs.Run{ID: name, Status: "Running", Runner: l.runnerName, Kind: kind, NodeName: nodeName})
 	}
 	sort.Slice(rs, func(i, j int) bool { return rs[i].ID < rs[j].ID })
 	if rs == nil {
@@ -107,6 +131,9 @@ func (l *Lister) List(ctx context.Context) ([]runs.Run, error) {
 // name itself as the attach handle (the local attacher targets sessions, not
 // pods). The "=" prefix forces tmux's exact-match semantics.
 func (l *Lister) Resolve(ctx context.Context, id string) (string, error) {
+	if _, _, ok := classifySession(id); !ok {
+		return "", runs.ErrNotFound
+	}
 	if _, err := l.runTmux(ctx, l.args("has-session", "-t", "="+id)...); err != nil {
 		return "", runs.ErrNotFound
 	}

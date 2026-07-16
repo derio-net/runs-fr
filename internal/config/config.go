@@ -21,6 +21,14 @@ type Config struct {
 	// AuthHeader is the trusted header carrying the authenticated user
 	// (default "X-Forwarded-User"), set by an upstream forward-auth proxy.
 	AuthHeader string
+	// AuthRoleHeader is the trusted header carrying the authenticated user's
+	// role (default "X-Forwarded-Role"), used to gate owner-only surfaces
+	// (node shells). Like AuthHeader it is untrusted UNLESS the upstream
+	// forward-auth proxy overwrites it on every request — a passthrough proxy
+	// that forwards a client-supplied value lets any caller assert "owner", so
+	// the proxy MUST set/strip it. Configurable so the same image installs
+	// behind any proxy's chosen header.
+	AuthRoleHeader string
 	// Kubeconfig is an optional path to a kubeconfig file. When empty the
 	// in-cluster config is used.
 	Kubeconfig string
@@ -42,14 +50,15 @@ type Config struct {
 // returns an error if a required value (NAMESPACE) is missing.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Addr:          envOr("ADDR", ":8080"),
-		Namespace:     os.Getenv("NAMESPACE"),
-		LabelSelector: envOr("LABEL_SELECTOR", "fr.run/id"),
-		AuthHeader:    envOr("AUTH_HEADER", "X-Forwarded-User"),
-		Kubeconfig:    os.Getenv("KUBECONFIG"),
-		Backend:       envOr("BACKEND", "kube"),
-		TmuxSocket:    os.Getenv("TMUX_SOCKET"),
-		RunnerName:    os.Getenv("RUNNER_NAME"),
+		Addr:           envOr("ADDR", ":8080"),
+		Namespace:      os.Getenv("NAMESPACE"),
+		LabelSelector:  envOr("LABEL_SELECTOR", "fr.run/id"),
+		AuthHeader:     envOr("AUTH_HEADER", "X-Forwarded-User"),
+		AuthRoleHeader: envOr("AUTH_ROLE_HEADER", "X-Forwarded-Role"),
+		Kubeconfig:     os.Getenv("KUBECONFIG"),
+		Backend:        envOr("BACKEND", "kube"),
+		TmuxSocket:     os.Getenv("TMUX_SOCKET"),
+		RunnerName:     os.Getenv("RUNNER_NAME"),
 	}
 
 	switch cfg.Backend {

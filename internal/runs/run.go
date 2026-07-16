@@ -14,5 +14,7 @@ type Run struct {
 	PodName string `json:"podName,omitempty"`
 	// Runner names the gateway serving this run (RUNNER_NAME); set by the
 	// local backend so aggregated multi-runner lists stay distinguishable.
-	Runner string `json:"runner,omitempty"`
+	Runner   string `json:"runner,omitempty"`
+	Kind     string `json:"kind,omitempty"`
+	NodeName string `json:"nodeName,omitempty"`
 }

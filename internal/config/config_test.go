@@ -5,7 +5,7 @@ import "testing"
 func TestLoad(t *testing.T) {
 	// envVars not listed in a case's env map are cleared for that case via
 	// t.Setenv(key, ""), so defaults are exercised deterministically.
-	allKeys := []string{"ADDR", "NAMESPACE", "LABEL_SELECTOR", "AUTH_HEADER", "KUBECONFIG", "BACKEND", "TMUX_SOCKET", "RUNNER_NAME"}
+	allKeys := []string{"ADDR", "NAMESPACE", "LABEL_SELECTOR", "AUTH_HEADER", "AUTH_ROLE_HEADER", "KUBECONFIG", "BACKEND", "TMUX_SOCKET", "RUNNER_NAME"}
 
 	tests := []struct {
 		name    string
@@ -22,22 +22,24 @@ func TestLoad(t *testing.T) {
 			name: "defaults applied when only namespace set",
 			env:  map[string]string{"NAMESPACE": "agents"},
 			want: Config{
-				Addr:          ":8080",
-				Namespace:     "agents",
-				LabelSelector: "fr.run/id",
-				AuthHeader:    "X-Forwarded-User",
-				Kubeconfig:    "",
-				Backend:       "kube",
+				Addr:           ":8080",
+				Namespace:      "agents",
+				LabelSelector:  "fr.run/id",
+				AuthHeader:     "X-Forwarded-User",
+				AuthRoleHeader: "X-Forwarded-Role",
+				Kubeconfig:     "",
+				Backend:        "kube",
 			},
 		},
 		{
 			name: "local backend needs no namespace",
 			env:  map[string]string{"BACKEND": "local"},
 			want: Config{
-				Addr:          ":8080",
-				LabelSelector: "fr.run/id",
-				AuthHeader:    "X-Forwarded-User",
-				Backend:       "local",
+				Addr:           ":8080",
+				LabelSelector:  "fr.run/id",
+				AuthHeader:     "X-Forwarded-User",
+				AuthRoleHeader: "X-Forwarded-Role",
+				Backend:        "local",
 			},
 		},
 		{
@@ -48,12 +50,13 @@ func TestLoad(t *testing.T) {
 				"RUNNER_NAME": "default",
 			},
 			want: Config{
-				Addr:          ":8080",
-				LabelSelector: "fr.run/id",
-				AuthHeader:    "X-Forwarded-User",
-				Backend:       "local",
-				TmuxSocket:    "/run/tmux/cnc.sock",
-				RunnerName:    "default",
+				Addr:           ":8080",
+				LabelSelector:  "fr.run/id",
+				AuthHeader:     "X-Forwarded-User",
+				AuthRoleHeader: "X-Forwarded-Role",
+				Backend:        "local",
+				TmuxSocket:     "/run/tmux/cnc.sock",
+				RunnerName:     "default",
 			},
 		},
 		{
@@ -71,12 +74,13 @@ func TestLoad(t *testing.T) {
 				"KUBECONFIG":     "/home/user/.kube/config",
 			},
 			want: Config{
-				Addr:          ":9090",
-				Namespace:     "runs",
-				LabelSelector: "fr.run/owner",
-				AuthHeader:    "X-Auth-Request-User",
-				Kubeconfig:    "/home/user/.kube/config",
-				Backend:       "kube",
+				Addr:           ":9090",
+				Namespace:      "runs",
+				LabelSelector:  "fr.run/owner",
+				AuthHeader:     "X-Auth-Request-User",
+				AuthRoleHeader: "X-Forwarded-Role",
+				Kubeconfig:     "/home/user/.kube/config",
+				Backend:        "kube",
 			},
 		},
 	}
