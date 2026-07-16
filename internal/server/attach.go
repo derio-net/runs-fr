@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/coder/websocket"
 
@@ -14,8 +15,15 @@ import (
 // validRunID constrains the {id} path segment. It is the trust boundary for the
 // attach endpoint: only ids matching this pattern are ever used to resolve a
 // pod or derive a tmux session name, so a hostile segment can never be
-// interpolated into a Kubernetes request.
-var validRunID = regexp.MustCompile(`^(?:[a-z0-9-]+|node:[a-z0-9-]+)$`)
+// interpolated into a Kubernetes request. Node shells are `node-<name>`, which
+// already lies within `[a-z0-9-]+` (colon-free per the naming correction), so
+// one pattern covers both run ids and node sessions.
+var validRunID = regexp.MustCompile(`^[a-z0-9-]+$`)
+
+// nodePrefix is the reserved prefix for node login shells (see
+// localterm.nodePrefix). A `node-<name>` attach is owner-gated and requires a
+// single-use, owner-bound attach token.
+const nodePrefix = "node-"
 
 // RunResolver maps a validated run id to the name of the live pod backing it.
 type RunResolver interface {
@@ -60,13 +68,19 @@ func (s *server) handleAttach(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid run id", http.StatusBadRequest)
 		return
 	}
-	if len(id) >= len("node:") && id[:len("node:")] == "node:" && r.Header.Get("X-Forwarded-Role") != "owner" {
-		http.Error(w, "node shell requires owner role", http.StatusForbidden)
-		return
-	}
-	if len(id) >= len("node:") && id[:len("node:")] == "node:" && !s.consumeNodeToken(r.URL.Query().Get("token"), id[len("node:"):], r.Header.Get(s.cfg.AuthHeader)) {
-		http.Error(w, "invalid or expired node attach token", http.StatusForbidden)
-		return
+	if strings.HasPrefix(id, nodePrefix) {
+		// Node shells are owner-only. The role header is trusted ONLY because
+		// the upstream forward-auth proxy overwrites it (see config.AuthRoleHeader);
+		// absent that guarantee it must be treated as client-supplied.
+		if r.Header.Get(s.cfg.AuthRoleHeader) != "owner" {
+			http.Error(w, "node shell requires owner role", http.StatusForbidden)
+			return
+		}
+		node := strings.TrimPrefix(id, nodePrefix)
+		if !s.consumeNodeToken(r.URL.Query().Get("token"), node, r.Header.Get(s.cfg.AuthHeader)) {
+			http.Error(w, "invalid or expired node attach token", http.StatusForbidden)
+			return
+		}
 	}
 
 	podName, err := s.resolver.Resolve(r.Context(), id)

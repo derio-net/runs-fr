@@ -77,7 +77,7 @@ func TestListNoServerIsEmpty(t *testing.T) {
 
 func TestListClassifiesNodeShells(t *testing.T) {
 	ft := &fakeTmux{respond: func(args []string) ([]byte, error) {
-		return []byte("run-a\nnode:default\nnode:build-2\n"), nil
+		return []byte("run-a\nnode-default\nnode-build-2\n"), nil
 	}}
 	l := NewLister("", "runner-a")
 	l.runTmux = ft.run
@@ -85,7 +85,7 @@ func TestListClassifiesNodeShells(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got[0].ID != "node:build-2" || got[1].Kind != "node" || got[1].NodeName != "default" || got[2].Kind != "" {
+	if len(got) != 3 || got[0].ID != "node-build-2" || got[1].Kind != "node" || got[1].NodeName != "default" || got[2].Kind != "" {
 		t.Fatalf("classified sessions = %#v", got)
 	}
 }
@@ -94,8 +94,33 @@ func TestResolveNodeShell(t *testing.T) {
 	ft := &fakeTmux{respond: func(args []string) ([]byte, error) { return nil, nil }}
 	l := NewLister("", "")
 	l.runTmux = ft.run
-	if got, err := l.Resolve(context.Background(), "node:default"); err != nil || got != "node:default" {
-		t.Fatalf("Resolve(node:default) = %q, %v", got, err)
+	if got, err := l.Resolve(context.Background(), "node-default"); err != nil || got != "node-default" {
+		t.Fatalf("Resolve(node-default) = %q, %v", got, err)
+	}
+}
+
+// TestClassifyReservesNodePrefix pins the reserved-prefix rule: a well-formed
+// node-<name> classifies as a node shell, while a malformed node-* (empty or
+// trailing-only) is attachable as NEITHER a node nor a run — it must never leak
+// as a freely-attachable run just because it lies within [a-z0-9-]+.
+func TestClassifyReservesNodePrefix(t *testing.T) {
+	cases := []struct {
+		name     string
+		wantKind string
+		wantNode string
+		wantOK   bool
+	}{
+		{"node-default", "node", "default", true},
+		{"node-build-2", "node", "build-2", true},
+		{"run-a", "", "", true},
+		{"node-", "", "", false}, // reserved prefix, no name → attachable as neither
+	}
+	for _, tc := range cases {
+		kind, node, ok := classifySession(tc.name)
+		if kind != tc.wantKind || node != tc.wantNode || ok != tc.wantOK {
+			t.Errorf("classifySession(%q) = (%q,%q,%v), want (%q,%q,%v)",
+				tc.name, kind, node, ok, tc.wantKind, tc.wantNode, tc.wantOK)
+		}
 	}
 }
 

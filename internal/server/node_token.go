@@ -11,7 +11,7 @@ import (
 var validNodeName = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 func (s *server) handleNodeToken(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-Forwarded-Role") != "owner" {
+	if r.Header.Get(s.cfg.AuthRoleHeader) != "owner" {
 		http.Error(w, "node shell requires owner role", http.StatusForbidden)
 		return
 	}
@@ -27,7 +27,16 @@ func (s *server) handleNodeToken(w http.ResponseWriter, r *http.Request) {
 	}
 	token := hex.EncodeToString(buf)
 	s.tokensMu.Lock()
-	s.tokens[token] = nodeToken{node: node, user: r.Header.Get(s.cfg.AuthHeader), expires: time.Now().Add(2 * time.Minute)}
+	// Sweep expired-but-unconsumed tokens on every mint so the map cannot grow
+	// unbounded from tokens that were issued but never attached (a client that
+	// requests "open shell" then closes the tab leaks one otherwise).
+	now := time.Now()
+	for t, rec := range s.tokens {
+		if !now.Before(rec.expires) {
+			delete(s.tokens, t)
+		}
+	}
+	s.tokens[token] = nodeToken{node: node, user: r.Header.Get(s.cfg.AuthHeader), expires: now.Add(2 * time.Minute)}
 	s.tokensMu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"token":"` + token + `"}`))

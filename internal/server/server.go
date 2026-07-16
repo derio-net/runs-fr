@@ -93,9 +93,11 @@ func New(cfg *config.Config, opts ...Option) http.Handler {
 	// (ServeMux does not strip the prefix), so routes register their full path.
 	//
 	// Trust boundary: the gateway cannot distinguish a proxy-set header from a
-	// client-spoofed one, so the upstream forward-auth proxy MUST overwrite
-	// cfg.AuthHeader on every inbound request. The Ingress manifests (later
-	// phase) own that guarantee.
+	// client-spoofed one, so the upstream forward-auth proxy MUST overwrite BOTH
+	// cfg.AuthHeader (identity) and cfg.AuthRoleHeader (role, gating owner-only
+	// node shells) on every inbound request — a forwarded client X-Forwarded-Role
+	// would let any caller assert `owner`. The Ingress manifests (later phase) own
+	// that guarantee.
 	apiMux := http.NewServeMux()
 	if s.lister != nil {
 		apiMux.HandleFunc("GET /api/runs", s.handleRuns)
@@ -139,7 +141,7 @@ func (s *server) handleRuns(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list runs", http.StatusInternalServerError)
 		return
 	}
-	if r.Header.Get("X-Forwarded-Role") != "owner" {
+	if r.Header.Get(s.cfg.AuthRoleHeader) != "owner" {
 		filtered := rs[:0]
 		for _, run := range rs {
 			if run.Kind != "node" {

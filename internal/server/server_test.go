@@ -12,10 +12,11 @@ import (
 
 func testConfig() *config.Config {
 	return &config.Config{
-		Addr:          ":8080",
-		Namespace:     "agents",
-		LabelSelector: "fr.run/id",
-		AuthHeader:    "X-Forwarded-User",
+		Addr:           ":8080",
+		Namespace:      "agents",
+		LabelSelector:  "fr.run/id",
+		AuthHeader:     "X-Forwarded-User",
+		AuthRoleHeader: "X-Forwarded-Role",
 	}
 }
 

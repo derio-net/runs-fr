@@ -11,14 +11,14 @@ tasks:
     title: Session listing and resolution
     steps:
       - id: P1.T1.S1
-        text: 'RED: test node:<name> classification, run session classification, deterministic sorting, and exact resolution for both kinds.'
+        text: 'RED: test node-<name> (colon-free — tmux rewrites ":"; node- prefix reserved) classification, run session classification, deterministic sorting, and exact resolution for both kinds, including a real-tmux integration test (the fakes emit output real tmux cannot).'
       - id: P1.T1.S2
-        text: 'GREEN: extend the local lister/resolver and run model with explicit node metadata without allowing node sessions to become runs.'
+        text: 'GREEN: extend the local lister/resolver and run model with explicit node metadata without allowing node sessions to become runs, reserving the node- prefix so no run id masquerades as a node shell.'
       - id: P1.T1.S3
         text: 'REFACTOR: keep prefix parsing and attach target construction centralized.'
 state:
   steps:
-    P1.T1.S1: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
-    P1.T1.S2: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
+    P1.T1.S1: {state: x, ticked_at: '2026-07-16T00:00:00Z', note: 'corrected: node:<name> -> node-<name> (tmux colon rewrite); added TestListerAgainstRealTmux + TestClassifyReservesNodePrefix'}
+    P1.T1.S2: {state: x, ticked_at: '2026-07-16T00:00:00Z', note: 'reserved node- prefix in classifySession'}
     P1.T1.S3: {state: x, ticked_at: '2026-07-14T22:00:00Z', note: null}
   completion: {at: '2026-07-14T22:00:00Z', note: 'implemented and reviewed', observed_prs: []}

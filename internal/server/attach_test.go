@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -87,7 +88,7 @@ func TestAttach_InvalidID400(t *testing.T) {
 
 func TestAttach_NodeRequiresOwner(t *testing.T) {
 	h := New(testConfig(), WithAttach(&stubResolver{pod: "p"}, newStubAttacher()))
-	req := httptest.NewRequest(http.MethodGet, "/api/runs/node%3Adefault/attach", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/node-default/attach", nil)
 	req.Header.Set(authTestHeader, "tester")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -161,6 +162,72 @@ func TestAttach_HandshakeAndPipe(t *testing.T) {
 	}
 	if resolver.gotID != "run-1" {
 		t.Errorf("resolver id = %q, want %q", resolver.gotID, "run-1")
+	}
+}
+
+// A node shell attach with the owner role AND a valid single-use token
+// completes the handshake and hands the node session name to the attacher.
+// This is the happy path the boundary-hardening phase claimed but never tested.
+func TestAttach_NodeHappyPathWithOwnerAndToken(t *testing.T) {
+	resolver := &stubResolver{pod: "node-pod"}
+	attacher := newStubAttacher()
+	h := New(testConfig(), WithAttach(resolver, attacher))
+
+	// Mint an owner-bound token for node "default" against the same handler.
+	mint := httptest.NewRequest(http.MethodPost, "/api/nodes/default/attach-token", nil)
+	mint.Header.Set(authTestHeader, "owner")
+	mint.Header.Set("X-Forwarded-Role", "owner")
+	mrec := httptest.NewRecorder()
+	h.ServeHTTP(mrec, mint)
+	if mrec.Code != http.StatusOK {
+		t.Fatalf("mint status = %d, want 200", mrec.Code)
+	}
+	var body struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(mrec.Body).Decode(&body); err != nil || body.Token == "" {
+		t.Fatalf("mint decode err=%v body=%q", err, mrec.Body.String())
+	}
+
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/runs/node-default/attach?token=" + body.Token
+	conn, _, err := websocket.Dial(context.Background(), wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{
+			authTestHeader:     []string{"owner"},
+			"X-Forwarded-Role": []string{"owner"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("node attach ws dial: %v", err)
+	}
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
+
+	select {
+	case call := <-attacher.calls:
+		if call.session != "node-default" {
+			t.Errorf("attacher session = %q, want %q", call.session, "node-default")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("attacher was never called for a valid node attach")
+	}
+	if resolver.gotID != "node-default" {
+		t.Errorf("resolver id = %q, want %q", resolver.gotID, "node-default")
+	}
+}
+
+// A node attach with the owner role but NO token (or a spent token) is refused
+// at the boundary — the token, not just the role, gates the attach.
+func TestAttach_NodeOwnerWithoutTokenRefused(t *testing.T) {
+	h := New(testConfig(), WithAttach(&stubResolver{pod: "p"}, newStubAttacher()))
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/node-default/attach", nil)
+	req.Header.Set(authTestHeader, "owner")
+	req.Header.Set("X-Forwarded-Role", "owner")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("owner-without-token status = %d, want 403", rec.Code)
 	}
 }
 

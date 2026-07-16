@@ -2,12 +2,19 @@
 #
 # SECURITY MODEL — READ THIS FIRST
 # --------------------------------
-# runs-fr trusts a single request header (authHeader, default X-Forwarded-User)
-# to identify the authenticated user. It performs NO authentication of its own.
-# The gateway MUST therefore only ever be reachable via a forward-auth proxy
-# (e.g. Authentik / oauth2-proxy / Traefik forwardAuth) that SETS or OVERWRITES
-# that header on every request. Anyone able to reach the Service or Ingress
-# directly can spoof the header and attach to run pods. For this reason:
+# runs-fr trusts request headers to identify the authenticated user (authHeader,
+# default X-Forwarded-User) and their ROLE (authRoleHeader, default
+# X-Forwarded-Role — gates owner-only node shells). It performs NO authentication
+# of its own. The gateway MUST therefore only ever be reachable via a
+# forward-auth proxy (e.g. Authentik / oauth2-proxy / Traefik forwardAuth) that
+# SETS or OVERWRITES BOTH headers on every request. This matters especially for
+# the role header: a passthrough proxy that merely FORWARDS a client-supplied
+# X-Forwarded-Role lets any caller assert `owner` and reach a node shell, while a
+# proxy that strips it leaves real owners locked out. The proxy must overwrite it
+# from the proxy's own identity decision; absent that guarantee the gateway
+# treats it as untrusted client input. Anyone able to reach the Service or
+# Ingress directly can spoof either header and attach to run pods or node
+# shells. For this reason:
 #   * service.type defaults to ClusterIP (no direct external exposure).
 #   * ingress is disabled by default; enable it ONLY behind a forward-auth proxy.
 #   * networkPolicy (opt-in) can lock ingress down to the trusted proxy only.
@@ -40,6 +47,14 @@ labelSelector: "fr.run/id"
 # authHeader is the trusted header carrying the authenticated user, set by the
 # upstream forward-auth proxy (exported as AUTH_HEADER). See SECURITY MODEL.
 authHeader: "X-Forwarded-User"
+
+# authRoleHeader is the trusted header carrying the authenticated user's ROLE
+# (exported as AUTH_ROLE_HEADER), used to gate owner-only surfaces such as node
+# shells. The upstream forward-auth proxy MUST overwrite this on every request
+# from its own identity decision — a forwarded client value is a spoof vector
+# (see SECURITY MODEL). Only requests whose role resolves to `owner` may list or
+# attach node shells.
+authRoleHeader: "X-Forwarded-Role"
 
 serviceAccount:
   # create toggles whether the chart creates the ServiceAccount.
