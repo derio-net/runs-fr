@@ -20,6 +20,10 @@ interface Run {
   harness: string;
   status: string;
   podName: string;
+  // kind is "node" for a node login shell (owner-only, token-gated) and empty
+  // for an ordinary run terminal; nodeName is the bare node name for the former.
+  kind?: string;
+  nodeName?: string;
 }
 
 const runsEl = document.getElementById("runs") as HTMLElement;
@@ -33,21 +37,95 @@ let term: Terminal | null = null;
 let fit: FitAddon | null = null;
 let ws: WebSocket | null = null;
 let resizeObserver: ResizeObserver | null = null;
+let selectedRun: Run | null = null;
+let attachGeneration = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempt = 0;
+// While the tab is hidden we do not burn reconnect attempts; a pending retry is
+// parked here and fired the moment the tab becomes visible again.
+let pendingReconnect: { run: Run; generation: number } | null = null;
+
+// Reconnects back off indefinitely (capped) rather than giving up after a fixed
+// budget: a spec-b agent turn can run for many minutes, far longer than any
+// small attempt ceiling, and the tab staying open is the real signal to keep
+// trying. The manual "Reconnect" button forces an immediate retry.
+const maxReconnectDelay = 10000;
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
 }
 
-// attachURL builds the same-origin websocket URL for a run, upgrading the
-// scheme to wss when the page itself is served over https.
-function attachURL(id: string): string {
+// getAttachURL builds the same-origin websocket URL for a run, upgrading the
+// scheme to wss when the page itself is served over https. For a NODE shell the
+// attach is gated by a single-use, owner-bound token, so a fresh token is minted
+// on every (re)connect attempt — a URL can never be replayed under the
+// single-use rule, which is exactly why reconnect must re-mint rather than reuse
+// the last URL. Ordinary run terminals need no token.
+async function getAttachURL(run: Run): Promise<string> {
   const scheme = location.protocol === "https:" ? "wss" : "ws";
-  return `${scheme}://${location.host}/api/runs/${encodeURIComponent(id)}/attach`;
+  const base = `${scheme}://${location.host}/api/runs/${encodeURIComponent(run.id)}/attach`;
+  if (run.kind !== "node") {
+    return base;
+  }
+  const name = run.nodeName ?? run.id.replace(/^node-/, "");
+  const resp = await fetch(`/api/nodes/${encodeURIComponent(name)}/attach-token`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!resp.ok) {
+    throw new Error(`attach-token HTTP ${resp.status}`);
+  }
+  const { token } = (await resp.json()) as { token: string };
+  return `${base}?token=${encodeURIComponent(token)}`;
+}
+
+// The manual reconnect affordance, created lazily and shown only while a run is
+// disconnected (or backing off). Clicking it forces an immediate retry.
+let reconnectButton: HTMLButtonElement | null = null;
+
+function hideReconnectButton(): void {
+  if (reconnectButton) {
+    reconnectButton.hidden = true;
+    reconnectButton.onclick = null;
+  }
+}
+
+function showReconnectButton(run: Run, generation: number): void {
+  if (!reconnectButton) {
+    reconnectButton = document.createElement("button");
+    reconnectButton.type = "button";
+    reconnectButton.className = "reconnect";
+    reconnectButton.textContent = "Reconnect";
+    statusEl.insertAdjacentElement("afterend", reconnectButton);
+  }
+  reconnectButton.hidden = false;
+  reconnectButton.onclick = () => {
+    // Stale generation (a different run is now selected) → the openSocket guard
+    // makes this a safe no-op.
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    pendingReconnect = null;
+    reconnectAttempt = 0;
+    hideReconnectButton();
+    term?.reset();
+    void openSocket(run, generation);
+  };
 }
 
 // teardown disposes the current terminal and closes the socket so selecting a
 // different run never leaks a terminal, socket, or observer.
 function teardown(): void {
+  attachGeneration++;
+  selectedRun = null;
+  reconnectAttempt = 0;
+  pendingReconnect = null;
+  hideReconnectButton();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   resizeObserver?.disconnect();
   resizeObserver = null;
   if (ws) {
@@ -72,8 +150,99 @@ function sendResize(): void {
   ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
 }
 
+// scheduleReconnect backs off (capped, no attempt ceiling) and retries while the
+// tab is visible, parking the attempt until visible when it is hidden. It always
+// offers the manual Reconnect button and resets the terminal before a
+// reconnected attach draws a fresh tmux screen.
+function scheduleReconnect(run: Run, generation: number, statusText: string): void {
+  if (generation !== attachGeneration || selectedRun !== run) {
+    return;
+  }
+  setStatus(statusText);
+  showReconnectButton(run, generation);
+
+  if (document.visibilityState === "hidden") {
+    // Do not burn retries on a backgrounded tab; the visibilitychange handler
+    // resumes immediately when the tab is shown again.
+    pendingReconnect = { run, generation };
+    return;
+  }
+
+  const delay = Math.min(maxReconnectDelay, 250 * 2 ** reconnectAttempt);
+  reconnectAttempt++;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    // Fresh session: clear the stale buffer so the reconnected attach's full
+    // redraw is not overlaid on the pre-disconnect screen.
+    term?.reset();
+    void openSocket(run, generation);
+  }, delay);
+}
+
+async function openSocket(run: Run, generation: number): Promise<void> {
+  if (generation !== attachGeneration || selectedRun !== run) {
+    return;
+  }
+
+  let url: string;
+  try {
+    url = await getAttachURL(run);
+  } catch (err) {
+    // Re-check after the await: the user may have selected another run.
+    if (generation !== attachGeneration || selectedRun !== run) {
+      return;
+    }
+    scheduleReconnect(run, generation, `Failed to prepare attach for ${run.id}: ${String(err)}`);
+    return;
+  }
+  // The token mint / URL build is async; re-validate the generation before we
+  // commit a socket to shared state.
+  if (generation !== attachGeneration || selectedRun !== run) {
+    return;
+  }
+
+  const socket = new WebSocket(url);
+  socket.binaryType = "arraybuffer";
+  ws = socket;
+
+  socket.onopen = () => {
+    if (generation !== attachGeneration || ws !== socket) {
+      socket.close();
+      return;
+    }
+    reconnectAttempt = 0;
+    pendingReconnect = null;
+    hideReconnectButton();
+    setStatus(`Attached to ${run.id} (${run.podName})`);
+    // Send the geometry the terminal already settled on before the socket
+    // opened, then keep it focused for input.
+    sendResize();
+    term?.focus();
+  };
+  // Server output arrives as binary frames; write the raw bytes to the terminal.
+  socket.onmessage = (ev: MessageEvent) => {
+    if (generation === attachGeneration && ev.data instanceof ArrayBuffer) {
+      term?.write(new Uint8Array(ev.data));
+    }
+  };
+  socket.onclose = () => {
+    if (generation !== attachGeneration || ws !== socket || selectedRun !== run) {
+      return;
+    }
+    ws = null;
+    scheduleReconnect(run, generation, `Disconnected from ${run.id}; reconnecting…`);
+  };
+  socket.onerror = () => {
+    if (generation === attachGeneration && ws === socket) {
+      setStatus(`Connection error on ${run.id}; reconnecting…`);
+    }
+  };
+}
+
 function attach(run: Run): void {
   teardown();
+  selectedRun = run;
+  const generation = attachGeneration;
   setStatus(`Attaching to ${run.id}…`);
 
   term = new Terminal({ convertEol: false, cursorBlink: true, fontSize: 13 });
@@ -95,32 +264,7 @@ function attach(run: Run): void {
   resizeObserver = new ResizeObserver(() => fit?.fit());
   resizeObserver.observe(terminalEl);
 
-  const socket = new WebSocket(attachURL(run.id));
-  socket.binaryType = "arraybuffer";
-  ws = socket;
-
-  socket.onopen = () => {
-    setStatus(`Attached to ${run.id} (${run.podName})`);
-    // Send the geometry the terminal already settled on before the socket
-    // opened, then keep it focused for input.
-    sendResize();
-    term?.focus();
-  };
-  // Server output arrives as binary frames; write the raw bytes to the terminal.
-  socket.onmessage = (ev: MessageEvent) => {
-    if (ev.data instanceof ArrayBuffer) {
-      term?.write(new Uint8Array(ev.data));
-    }
-  };
-  socket.onclose = () => {
-    setStatus(`Disconnected from ${run.id}.`);
-    // The session is over: stop observing layout so the now-dead terminal
-    // stops re-fitting. The terminal stays mounted so its final output remains
-    // visible until another run is selected (which runs teardown()).
-    resizeObserver?.disconnect();
-    resizeObserver = null;
-  };
-  socket.onerror = () => setStatus(`Connection error on ${run.id}.`);
+  void openSocket(run, generation);
 }
 
 function renderRuns(runs: Run[]): void {
@@ -188,4 +332,26 @@ async function loadRuns(): Promise<void> {
 // down per run): `fit` is null between and after sessions, so the optional-chain
 // guard makes this a safe no-op until a run is attached.
 window.addEventListener("resize", () => fit?.fit());
+
+// A tab that was hidden parks its reconnect; fire it the moment it is shown
+// again so a long-lived attach comes back immediately instead of on the next
+// backoff tick (or never, for a tab hidden across the whole outage).
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !pendingReconnect) {
+    return;
+  }
+  const { run, generation } = pendingReconnect;
+  pendingReconnect = null;
+  if (generation !== attachGeneration || selectedRun !== run) {
+    return;
+  }
+  const delay = Math.min(maxReconnectDelay, 250 * 2 ** reconnectAttempt);
+  reconnectAttempt++;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    term?.reset();
+    void openSocket(run, generation);
+  }, delay);
+});
+
 void loadRuns();
