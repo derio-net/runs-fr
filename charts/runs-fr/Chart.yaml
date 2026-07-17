@@ -5,7 +5,7 @@ type: application
 # version is the chart version; appVersion tracks the gateway image. Both are
 # bumped together for the walking skeleton.
 version: 0.2.2
-appVersion: "0.2.3"
+appVersion: "0.2.4"
 home: https://github.com/derio-net/runs-fr
 sources:
   - https://github.com/derio-net/runs-fr
