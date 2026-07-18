@@ -2,6 +2,7 @@ package term
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	"github.com/coder/websocket"
@@ -22,6 +23,11 @@ type KubeAttacher struct {
 	clientset    kubernetes.Interface
 	namespace    string
 	pingInterval time.Duration
+	newExecutor  func(*rest.Config, *url.URL) (remotecommand.Executor, error)
+}
+
+type pinger interface {
+	Ping(context.Context) error
 }
 
 // NewKubeAttacher builds an attacher for pods in namespace, using cfg for the
@@ -32,6 +38,7 @@ func NewKubeAttacher(cfg *rest.Config, clientset kubernetes.Interface, namespace
 		clientset:    clientset,
 		namespace:    namespace,
 		pingInterval: defaultPingInterval,
+		newExecutor:  NewExecutor,
 	}
 }
 
@@ -40,7 +47,7 @@ func NewKubeAttacher(cfg *rest.Config, clientset kubernetes.Interface, namespace
 // StreamWithContext drives it and returns when the stream ends, ctx is
 // cancelled, or the peer is detected dead via the ping loop.
 func (a *KubeAttacher) Attach(ctx context.Context, conn *websocket.Conn, podName, sessionName string) error {
-	executor, err := NewExecutor(a.cfg, BuildExecURL(a.clientset, a.namespace, podName, sessionName))
+	executor, err := a.newExecutor(a.cfg, BuildExecURL(a.clientset, a.namespace, podName, sessionName))
 	if err != nil {
 		return err
 	}
@@ -62,7 +69,7 @@ func (a *KubeAttacher) Attach(ctx context.Context, conn *websocket.Conn, podName
 
 // pingLoop pings the peer on an interval; a ping that fails within its deadline
 // means the browser is gone, so it cancels the session to tear the exec down.
-func (a *KubeAttacher) pingLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn) {
+func (a *KubeAttacher) pingLoop(ctx context.Context, cancel context.CancelFunc, conn pinger) {
 	ticker := time.NewTicker(a.pingInterval)
 	defer ticker.Stop()
 	for {
