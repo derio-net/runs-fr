@@ -1,8 +1,9 @@
 name: build
 # Per-commit image for the staging-gate. Every push to main builds + pushes
-# ghcr.io/derio-net/runs-fr:sha-<short> and fires a repository_dispatch
-# (event_type=staging-gate) that triggers Frank's Tekton gate. The `v*` release
-# build (release.yml) is unchanged — that's for explicit human releases.
+# ghcr.io/derio-net/runs-fr:sha-<short> and then notifies Frank's Tekton
+# github-listener directly with a signed POST (see the trigger-gate job for why
+# it is not a repository_dispatch). The `v*` release build (release.yml) is
+# unchanged — that's for explicit human releases.
 on:
   push:
     branches: [main]
@@ -72,12 +73,78 @@ jobs:
   trigger-gate:
     needs: [image, smoke-image]
     runs-on: ubuntu-latest
+    # No `permissions:` override: this job no longer calls the GitHub API at
+    # all, so the workflow-level `contents: read` is all it needs.
+    #
+    # Why not a repository_dispatch? Two reasons, in order of finality:
+    #   1. It cannot be delivered. GitHub's webhook availability matrix lists
+    #      `repository_dispatch` as an "app"-only event, so a per-repo webhook
+    #      — which is what Frank's Tekton github-listener is reached by —
+    #      cannot subscribe to it. Verified 2026-09-20 at
+    #      https://docs.github.com/en/webhooks/webhook-events-and-payloads
+    #      and corroborated live: agentic-stoa/cnc-frd's hook carries only
+    #      [pull_request, push] despite a repository_dispatch trigger, and
+    #      derio-net/runs-fr has no hooks at all.
+    #   2. Creating one also 403s here ("Resource not accessible by
+    #      integration") because GITHUB_TOKEN only has `contents: read`.
+    #
+    # So we post the event straight to the listener. Tekton's `github`
+    # interceptor validates an HMAC-SHA256 over the request body and reads
+    # X-GitHub-Event; it does not require GitHub to be the sender.
     steps:
-      - name: Fire staging-gate repository_dispatch
+      - name: Notify Frank staging gate
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GATE_URL: https://webhooks.hop.derio.net/
+          # Mirrors Frank's Infisical /derio-net/GITHUB_WEBHOOK_SECRET.
+          GATE_SECRET: ${{ secrets.FRANK_STAGING_GATE_WEBHOOK_SECRET }}
+          # Frank's CEL filter pins repository.full_name to this literal; it
+          # is github.repository, passed through env rather than interpolated
+          # into the script body.
+          REPO: ${{ github.repository }}
+          SHA: ${{ needs.image.outputs.sha }}
         run: |
-          gh api repos/${{ github.repository }}/dispatches \
-            -f event_type=staging-gate \
-            -F client_payload[app]=runs-fr \
-            -F client_payload[sha]=${{ needs.image.outputs.sha }}
+          set -euo pipefail
+
+          if [ -z "${GATE_SECRET}" ]; then
+            echo "::error title=staging gate not notified::secret FRANK_STAGING_GATE_WEBHOOK_SECRET is unset — skipping the signed POST rather than sending an unsigned request the Tekton interceptor would reject. Seed the repository Actions secret to arm the gate."
+            {
+              echo "### Staging gate NOT notified"
+              echo
+              echo "\`FRANK_STAGING_GATE_WEBHOOK_SECRET\` is unset, so no signed POST was sent for \`${SHA}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          body="${RUNNER_TEMP}/staging-gate-body.json"
+          # jq builds the body once, to a file. The HMAC is computed over that
+          # file and curl sends that same file with --data-binary: the bytes
+          # signed and the bytes sent are identical, which the interceptor
+          # requires. -j drops jq's trailing newline; -c keeps it compact.
+          # --arg keeps the short sha a JSON *string* (Frank's CEL requires
+          # ^[a-f0-9]{7,40}$ against a string, and an all-digit short sha would
+          # otherwise be ambiguous).
+          jq -cjn \
+            --arg app runs-fr \
+            --arg sha "${SHA}" \
+            --arg repo "${REPO}" \
+            '{action:"staging-gate",client_payload:{app:$app,sha:$sha},repository:{full_name:$repo}}' \
+            > "${body}"
+
+          sig="$(openssl dgst -sha256 -hmac "${GATE_SECRET}" -r "${body}" | cut -d' ' -f1)"
+
+          # The listener answers 202 on acceptance. -f fails the step on any
+          # HTTP error; the explicit check below catches a non-2xx that -f
+          # would let through (e.g. a 3xx).
+          status="$(curl -fsS -X POST "${GATE_URL}" \
+            -H 'Content-Type: application/json' \
+            -H 'X-GitHub-Event: repository_dispatch' \
+            -H "X-Hub-Signature-256: sha256=${sig}" \
+            --data-binary "@${body}" \
+            -o "${RUNNER_TEMP}/staging-gate-response.txt" \
+            -w '%{http_code}')"
+
+          if [ "${status#2}" = "${status}" ]; then
+            echo "::error title=staging gate rejected the notification::listener returned HTTP ${status}"
+            exit 1
+          fi
+          echo "staging gate notified for ${SHA}: HTTP ${status}"
