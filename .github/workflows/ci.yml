@@ -2,7 +2,8 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    # sync-* branches exist only on the Gitea mirror (re-run triggers).
+    branches: [main, 'sync-pr-**', 'sync-rerun-**']
   pull_request:
 
 permissions:
@@ -10,6 +11,8 @@ permissions:
 
 jobs:
   go:
+    # Authority gate: see derio-net/frank:docs/superpowers/specs/2026-10-18--cicd--github-preferred-gitea-fallback-design.md
+    if: (vars.CI_AUTHORITY || 'github') == (github.server_url == 'https://github.com' && 'github' || 'gitea')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +43,7 @@ jobs:
           version: v2.3
 
   helm:
+    if: (vars.CI_AUTHORITY || 'github') == (github.server_url == 'https://github.com' && 'github' || 'gitea')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

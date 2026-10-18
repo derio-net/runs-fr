@@ -14,6 +14,9 @@ permissions:
 
 jobs:
   image:
+    # Mutating jobs here (image push, staging-gate dispatch) are pinned to
+    # GitHub. See derio-net/frank:docs/superpowers/specs/2026-10-18--cicd--github-preferred-gitea-fallback-design.md
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.short.outputs.sha }}
@@ -47,6 +50,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   smoke-image:
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +76,7 @@ jobs:
 
   trigger-gate:
     needs: [image, smoke-image]
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     # No `permissions:` override: this job no longer calls the GitHub API at
     # all, so the workflow-level `contents: read` is all it needs.

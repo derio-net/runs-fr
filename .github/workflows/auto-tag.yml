@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   tag:
+    # Mutating (tag, release, GHCR push): pinned to GitHub. See
+    # derio-net/frank:docs/superpowers/specs/2026-10-18--cicd--github-preferred-gitea-fallback-design.md
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
