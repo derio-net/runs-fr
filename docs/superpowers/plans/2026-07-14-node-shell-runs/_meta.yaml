@@ -2,5 +2,5 @@ schema_version: 2
 plan: 2026-07-14-node-shell-runs
 spec: agentic-stoa/cnc-fr:docs/superpowers/specs/2026-07-13-a-node-shell-shared-auth-design.md
 target_repo: derio-net/runs-fr
-fr_version: '>=3.0.0,<5.0.0'
+fr_version: '>=3.0.0,<7.0.0'
 created: '2026-07-14'
