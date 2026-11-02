@@ -1,6 +1,13 @@
+schema_version: 2
 profiles:
   dev:
     purpose: 'build/test runs-fr gateway: go build/test/vet, golangci-lint, esbuild
       frontend, helm lint/template'
     secrets: []
 default: dev
+forge:
+  type: github
+ci:
+  type: github-actions
+tracking:
+  type: github
