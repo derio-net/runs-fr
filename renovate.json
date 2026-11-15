@@ -4,6 +4,7 @@
   "schedule": ["before 6am on monday"],
   "timezone": "Etc/UTC",
   "automerge": false,
+  "minimumReleaseAge": "3 days",
   "dependencyDashboard": {"enabled": true, "title": "Dependency Dashboard (runs-fr)"},
   "ignorePresets": [":ignoreModulesAndTests"],
   "ignorePaths": ["**/node_modules/**", "**/bower_components/**", "**/vendor/**"],
