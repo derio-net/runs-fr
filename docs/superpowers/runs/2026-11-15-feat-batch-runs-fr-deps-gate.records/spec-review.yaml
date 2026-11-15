@@ -1,0 +1,80 @@
+schema_version: 12
+run: 2026-11-15-feat-batch-runs-fr-deps-gate
+step: spec-review
+outcome: done
+journal:
+  - kind: finding
+    id: s-r1-1
+    review_scope: in
+    title: "deps-gate-supported-toolchain claims PR CI verifies the Docker build stage, but no PR job builds the image"
+    body: "Evidence: ci.yml:13-43 has no docker build; build.yml:7-9 builds only on push to main; Dockerfile:25 is changed by this spec. The golang:1.27-alpine stage would first compile after merge."
+  - kind: finding
+    id: s-r1-2
+    review_scope: in
+    title: "Weekly-scan half of deps-gate-vuln-gate-blocks is provable only post-merge, yet the row was verify: none, the Test Plan never checked it, and 'surfaces' had no mechanism"
+    body: "Evidence: the row's text; spec §Verification; Test Plan items 1-3. A schedule fires only from the default branch; a failed scheduled run notifies only the last cron editor; GitHub disables schedules after 60 days of inactivity."
+  - kind: finding
+    id: s-r1-3
+    review_scope: in
+    title: "deps-gate-vuln-gate-blocks cited R6 (per-package coverage), which its text does not cover"
+    body: "Evidence: docs/acceptance/features/2026-11-15-runs-fr-deps-gate.yaml:49-51 (origin R5, R6); spec R6 was the -cover requirement."
+  - kind: finding
+    id: s-r1-4
+    review_scope: in
+    title: "Renovate does not track the golangci-lint pin; a Renovate Go-minor bump would break lint"
+    body: "Evidence: ci.yml:40-43 (`version: v2.3` is an action input, not a `uses:` ref); the spec's customManagers covered only pip and govulncheck."
+  - kind: finding
+    id: s-r1-5
+    review_scope: in
+    title: "The 'go toolchain' group's claim to keep go.mod and the golang image in one PR is not established"
+    body: "Evidence: spec §Renovate group (matchDatasources golang-version/docker); go.mod:3,5; Dockerfile:25. Renovate may treat the `go` directive as a floor, and toolchain patch bumps have no matching minor-only image tag change."
+  - kind: finding
+    id: s-r1-6
+    review_scope: in
+    title: "R3's 'go mod tidy leaves go.mod/go.sum clean' had no check in CI"
+    body: "Evidence: spec R3; the row deps-gate-no-reachable-vulns cites R3 but was verified only by govulncheck; ci.yml:13-43 has no tidy check."
+  - kind: finding
+    id: s-r1-7
+    review_scope: in
+    title: "Design added a workflow_dispatch trigger that R5 did not mention"
+    body: "Evidence: spec §Vulnerability gate (`workflow_dispatch:`) vs R5 (PR, push, schedule only)."
+  - kind: finding
+    id: s-r1-8
+    review_scope: in
+    title: "Makefile `test` target diverges from CI's test step once -cover is added"
+    body: "Evidence: Makefile:7-8 (`go test ./... -race`); README documents make targets as CI's local mirror. Reviewer tagged this out of scope; reclassified in because this change introduces the -cover divergence, so it is this change's to keep in step."
+  - kind: review
+    id: spec-review-r1
+    title: "Independent spec review r1: 8 findings (reviewer: 7 in, 1 out; s-r1-8 reclassified in); all fixed in the spec"
+    body: |
+      Dispatched fr-spec-reviewer (read-only, in this workspace) against the spec, the spec journal's 6 operator decisions, and the codebase. It confirmed all 6 decisions are honoured, that no other Go version pin exists (release.yml/build.yml have no setup-go; the devcontainer uses the unpinned go:1 feature), that the govulncheck job compiles without a frontend build (tracked static/index.html and xterm.css satisfy the embed glob), that schedule/workflow_dispatch do not interact with the CI-authority `if:`, and that the Renovate manager names, managerFilePatterns syntax and the pip/govulncheck regexes are correct.
+      Findings s-r1-1..s-r1-8 raised; all fixed in the spec (see resolves).
+resolves:
+  - id: s-r1-1
+    state: fixed
+    body: "New R9 wording plus a new §'Image build on PRs': ci.yml gains an `image` job (buildx + build-push-action@v6, push: false, same majors as build.yml). The row's Verification line now names the `image` job."
+  - id: s-r1-2
+    state: fixed
+    body: "R6 is now the weekly schedule + workflow_dispatch + surfacing requirement: a scheduled govulncheck failure on GitHub opens or comments on a `govulncheck: reachable vulnerability on main` issue (job-scoped issues: write). The 60-day schedule-disable limit is documented. The row is verify: live (fr acceptance set-status, baf0e37) and Test Plan item 3 exercises workflow_dispatch and checks for a scheduled run."
+  - id: s-r1-3
+    state: fixed
+    body: "Requirements renumbered so the row's existing citations are true: R5 = the PR/push hard gate, R6 = the weekly scan and its surfacing, which is what the row states. Coverage moved to R11, which no row cites (an implementation detail of #32's baseline, not a business-level claim)."
+  - id: s-r1-4
+    state: fixed
+    body: "R8 and the Renovate design add a regex customManager for golangci-lint-action's `version:` input (github-releases, depName golangci/golangci-lint), placed in the `go toolchain` group so a new Go minor lands together with a linter that supports it."
+  - id: s-r1-5
+    state: fixed
+    body: "Added a 'Drift policy' paragraph: the invariant is the Go minor. The `go` directive gets `rangeStrategy: bump` (matchDepTypes golang); the group matches by package name (go, golang, golangci/golangci-lint) across datasources; toolchain-only patch bumps are consistent with the minor-only image tag. The plan validates with renovate-config-validator AND a `--dry-run=extract` that must list deps from every manager."
+  - id: s-r1-6
+    state: fixed
+    body: "R3 now requires CI to fail on drift; the design adds a `go mod tidy -diff` step to the `go` job; the row's Verification line names it."
+  - id: s-r1-7
+    state: fixed
+    body: "workflow_dispatch is now in R6 with its purpose (exercise the scheduled path on demand), and Test Plan item 3 uses it."
+  - id: s-r1-8
+    state: fixed
+    body: "R11 now covers both the CI test step and `make test`; the design adds -cover to the Makefile target."
+acceptance: []
+evidence:
+  review: spec-review-r1
+  reviewer: aeeecf379c3fa965f
