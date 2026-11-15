@@ -3,7 +3,7 @@ run: 2026-11-15-feat-batch-runs-fr-deps-gate
 workflow: fr-goal@1
 branch: feat/batch-runs-fr-deps-gate
 started: '2026-11-15T06:22:31+00:00'
-cursor: plan-review
+cursor: implement
 steps:
   brainstorm:
     state: done
@@ -46,7 +46,14 @@ steps:
           returned: '2026-11-15T07:12:01+00:00'
           outcome: done
   plan-review:
-    state: pending
+    state: done
+    at: '2026-11-15T07:12:05+00:00'
+    exit: 0
+    stdout: "[warn] orphan phase-split decision phase-split-2026-11-15-runs-fr-deps-gate-p3\
+      \ \nnames no agentic phase; it waives nothing.\n[warn] phase 3 is a single operator\
+      \ step — if it verifies (screenshot, live \ncheck, post-merge run), make it\
+      \ a Test Plan line or a `verify: live` acceptance \nrow; keep a [manual] phase\
+      \ only for a prerequisite or a real dispatch/deploy.\n"
   implement:
     state: pending
     members:
