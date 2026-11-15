@@ -151,8 +151,9 @@ the new version reports findings; real findings are fixed, not disabled.
   "schedule": ["before 6am on monday"],
   "timezone": "Etc/UTC",
   "automerge": false,
-  "dependencyDashboard": true,
-  "dependencyDashboardTitle": "Dependency Dashboard (runs-fr)",
+  "dependencyDashboard": {"enabled": true, "title": "Dependency Dashboard (runs-fr)"},
+  "ignorePresets": [":ignoreModulesAndTests"],
+  "ignorePaths": ["**/node_modules/**", "**/bower_components/**", "**/vendor/**"],
   "postUpdateOptions": ["gomodTidy"],
   "enabledManagers": ["gomod", "npm", "dockerfile", "github-actions", "custom.regex"],
   "packageRules": [
@@ -160,8 +161,10 @@ the new version reports findings; real findings are fixed, not disabled.
     {"groupName": "golang.org/x", "matchManagers": ["gomod"], "matchPackageNames": ["golang.org/x/**"]},
     {"groupName": "xterm", "matchManagers": ["npm"], "matchPackageNames": ["@xterm/**"]},
     {"groupName": "github-actions", "matchManagers": ["github-actions"]},
-    {"groupName": "go toolchain", "matchPackageNames": ["go", "golang", "golangci/golangci-lint"]},
-    {"matchManagers": ["gomod"], "matchDepTypes": ["golang"], "rangeStrategy": "bump"}
+    {"groupName": "node", "matchDepNames": ["node"]},
+    {"groupName": "go toolchain", "matchPackageNames": ["go", "golang", "golangci/golangci-lint"], "minimumReleaseAge": "7 days"},
+    {"matchManagers": ["gomod"], "matchDepTypes": ["golang"], "rangeStrategy": "bump", "allowedVersions": "/^\\d+\\.\\d+\\.0$/"},
+    {"matchManagers": ["github-actions"], "matchDepTypes": ["uses-with"], "matchPackageNames": ["golangci/golangci-lint"], "enabled": false}
   ],
   "customManagers": [
     {"customType": "regex", "managerFilePatterns": ["/^test/e2e/Dockerfile$/"],
@@ -179,18 +182,42 @@ the new version reports findings; real findings are fixed, not disabled.
 
 **Drift policy (R1, R8).** The invariant is that go.mod, the Docker build
 stage and CI agree on the Go **minor**. CI reads go.mod, so it cannot drift.
-The `go toolchain` group moves go.mod's `go` directive (depType `golang`,
-`rangeStrategy: bump` so it advances on a new minor rather than staying a
-floor), its `toolchain` line (depType `toolchain`), the Dockerfile's
-`golang:<minor>-alpine` tag and the golangci-lint pin in one PR, so a new Go
-minor never lands without a linter that understands it. A toolchain-only patch
-bump (`go1.27.4` → `go1.27.5`) leaves the minor-only Docker tag unchanged,
-which is consistent with the invariant (the tag floats to the newest 1.27.x).
-The plan validates the file with `renovate-config-validator` AND a local
-extraction dry run (`renovate --platform=local --dry-run=extract`, via
-`npx --package renovate`) that must list deps from every manager, including the
-three regex managers. Renovate PRs are verified by the same CI, including the
-govulncheck gate.
+The `go toolchain` group moves go.mod's `go` directive (depType `golang`), its
+`toolchain` line (depType `toolchain`), the Dockerfile's `golang:<minor>-alpine`
+tag and the golangci-lint pin in one PR, so a new Go minor never lands without
+a linter that understands it.
+
+- The `go` directive advances **only to a new minor's `.0`**: `rangeStrategy:
+  bump` lets it move at all (otherwise it is a floor that never moves), and
+  `allowedVersions: /^\d+\.\d+\.0$/` keeps it off patches. Without the
+  second rule Renovate proposes `1.27.0 → 1.27.4` at once (shown by a
+  `--dry-run=lookup`); that raises the hard minimum on every patch, makes
+  `go mod tidy` drop the toolchain line, and breaks the `image` job whenever
+  Docker Hub's `golang:1.27-alpine` (built with `GOTOOLCHAIN=local`) lags the
+  new patch.
+- Patches reach the `toolchain` line only, which the minor-only Docker tag is
+  consistent with (the tag floats to the newest 1.27.x).
+- The group waits `minimumReleaseAge: 7 days`, so a new Go release is not
+  proposed before Docker Hub's image and a supporting golangci-lint exist.
+- golangci-lint is tracked once, by the regex manager: the built-in
+  github-actions manager also extracts the action's `with: version` (depType
+  `uses-with`), and that duplicate is disabled.
+
+Two more rules keep stated pairings intact: a `node` group (`matchDepNames`,
+which matches both the Dockerfile's `node` image and `setup-node`'s
+`node-version`, whose packageName differs) keeps `Dockerfile:11`'s "Node 22
+matches the CI toolchain" true across a bump. `config:recommended` ignores
+`**/test/**`, which would leave `test/e2e/Dockerfile` and its pip regex manager
+with nothing to extract, so `:ignoreModulesAndTests` is dropped and
+`ignorePaths` restated without the test globs; `dependencyDashboard` takes the
+object form `--strict` requires.
+
+The plan validates the file with `renovate-config-validator --strict` AND local
+dry runs (`npx --package renovate`, `RENOVATE_CONFIG_FILE=renovate.json
+renovate --platform=local`): `--dry-run=extract` must list deps from every
+manager, including the three regex managers, and `--dry-run=lookup` must show
+the update proposals the rules above intend. Renovate PRs are verified by the
+same CI, including the govulncheck gate and test/pins.
 
 Renovate only reads a repo the app can see. If the derio-net installation is
 repo-selected rather than all-repos, enabling it for runs-fr is an operator
