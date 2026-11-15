@@ -53,10 +53,16 @@ func readLines(t *testing.T, path string) []string {
 	return lines
 }
 
-// findFirst returns the first line matching re, with its first submatch as ver.
+// findFirst returns the first line of the file matching re, with its first
+// submatch as ver.
 func findFirst(t *testing.T, path string, re *regexp.Regexp) (pin, bool) {
 	t.Helper()
-	for i, l := range readLines(t, path) {
+	return findFirstIn(path, readLines(t, path), re)
+}
+
+// findFirstIn is findFirst over lines already read (path only labels the pin).
+func findFirstIn(path string, lines []string, re *regexp.Regexp) (pin, bool) {
+	for i, l := range lines {
 		if m := re.FindStringSubmatch(l); m != nil {
 			return pin{file: path, line: i + 1, text: strings.TrimSpace(l), ver: m[1]}, true
 		}
@@ -76,29 +82,52 @@ func minorOf(v string) string {
 var (
 	reGoDirective = regexp.MustCompile(`^go\s+(\d+\.\d+(?:\.\d+)?)\s*$`)
 	reToolchain   = regexp.MustCompile(`^toolchain\s+go(\d+\.\d+(?:\.\d+)?)\s*$`)
-	reBuildStage  = regexp.MustCompile(`^FROM\s+golang:(\d+\.\d+(?:\.\d+)?)-alpine\s+AS\s+build\b`)
+	// An optional @sha256 digest: Renovate's dockerfile manager writes one
+	// when digest pinning is on.
+	reBuildStage = regexp.MustCompile(`^FROM\s+golang:(\d+\.\d+(?:\.\d+)?)-alpine(?:@sha256:[0-9a-f]+)?\s+AS\s+build\b`)
 )
 
-// goModPins parses go.mod's go directive and toolchain line.
+// parseGoMod returns go.mod's go directive and its toolchain. cmd/go omits a
+// `toolchain` line equal to the go directive (and `go mod tidy` removes one),
+// so a missing line means "the go directive's version", never an error.
+func parseGoMod(path string, lines []string) (goDir, toolchain pin, err error) {
+	goDir, ok := findFirstIn(path, lines, reGoDirective)
+	if !ok {
+		return pin{}, pin{}, fmt.Errorf("%s: no `go X.Y[.Z]` directive", path)
+	}
+	toolchain, ok = findFirstIn(path, lines, reToolchain)
+	if !ok {
+		toolchain = goDir
+		toolchain.text += " (no toolchain line: it equals the go directive)"
+	}
+	return goDir, toolchain, nil
+}
+
+// parseBuildStage returns the Dockerfile's `FROM golang:<v>-alpine AS build`.
+func parseBuildStage(path string, lines []string) (pin, error) {
+	p, ok := findFirstIn(path, lines, reBuildStage)
+	if !ok {
+		return pin{}, fmt.Errorf("%s: no `FROM golang:<minor>-alpine[@sha256:…] AS build` stage", path)
+	}
+	return p, nil
+}
+
+// goModPins parses the repo's go.mod; see parseGoMod.
 func goModPins(t *testing.T) (goDir, toolchain pin) {
 	t.Helper()
-	goDir, ok := findFirst(t, goModPath, reGoDirective)
-	if !ok {
-		t.Fatalf("%s: no `go X.Y[.Z]` directive", goModPath)
-	}
-	toolchain, ok = findFirst(t, goModPath, reToolchain)
-	if !ok {
-		t.Fatalf("%s: no `toolchain goX.Y.Z` line", goModPath)
+	goDir, toolchain, err := parseGoMod(goModPath, readLines(t, goModPath))
+	if err != nil {
+		t.Fatal(err)
 	}
 	return goDir, toolchain
 }
 
-// dockerBuildStage parses the Dockerfile's `FROM golang:<v>-alpine AS build`.
+// dockerBuildStage parses the repo's Dockerfile; see parseBuildStage.
 func dockerBuildStage(t *testing.T) pin {
 	t.Helper()
-	p, ok := findFirst(t, dockerfilePath, reBuildStage)
-	if !ok {
-		t.Fatalf("%s: no `FROM golang:<minor>-alpine AS build` stage", dockerfilePath)
+	p, err := parseBuildStage(dockerfilePath, readLines(t, dockerfilePath))
+	if err != nil {
+		t.Fatal(err)
 	}
 	return p
 }
