@@ -12,7 +12,17 @@ steps:
     emitted:
       spec: docs/superpowers/specs/2026-11-15-runs-fr-deps-gate-design.md
   spec-review:
-    state: pending
+    state: running
+    at: '2026-11-15T07:03:25+00:00'
+    units:
+      step/spec-review:
+        attempts:
+        - dispatched: '2026-11-15T07:03:25+00:00'
+          agent_type: super-fr:fr-spec-reviewer
+          harness: claude-code
+          tier: hard
+          bound: opus
+          session: 8fb51872-215d-4dcb-9405-c4ec9b9d72c4
   plan:
     state: pending
   plan-review:
