@@ -20,9 +20,9 @@ COPY web/ ./
 RUN npm run build
 
 # ---- Stage 2: static Go binary ------------------------------------------------
-# go.mod pins go 1.23. CGO_ENABLED=0 yields a fully static binary that runs on
+# go.mod pins go 1.27. CGO_ENABLED=0 yields a fully static binary that runs on
 # distroless-static with no libc.
-FROM golang:1.23-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 # Download modules first for layer caching.
 COPY go.mod go.sum ./

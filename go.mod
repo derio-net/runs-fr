@@ -1,8 +1,8 @@
 module github.com/derio-net/runs-fr
 
-go 1.23.0
+go 1.27.0
 
-toolchain go1.23.4
+toolchain go1.27.4
 
 require (
 	github.com/coder/websocket v1.8.14
