@@ -56,7 +56,7 @@ steps:
       \ only for a prerequisite or a real dispatch/deploy.\n"
   implement:
     state: running
-    at: '2026-11-15T07:12:06+00:00'
+    at: '2026-11-15T07:12:29+00:00'
     members:
     - implement-phase
     - review-phase
@@ -67,6 +67,14 @@ steps:
         state: running
         attempts:
         - dispatched: '2026-11-15T07:12:06+00:00'
+          agent_type: super-fr:fr-phase-executor
+          harness: claude-code
+          tier: hard
+          bound: opus
+          session: 8fb51872-215d-4dcb-9405-c4ec9b9d72c4
+          returned: '2026-11-15T07:12:29+00:00'
+          outcome: abandoned
+        - dispatched: '2026-11-15T07:12:29+00:00'
           agent_type: super-fr:fr-phase-executor
           harness: claude-code
           tier: hard
