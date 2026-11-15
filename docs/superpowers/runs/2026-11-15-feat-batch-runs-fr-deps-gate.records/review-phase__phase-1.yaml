@@ -88,6 +88,9 @@ resolves:
   - id: p1-r5
     state: refuted
     body: "Real, but not fixable in this PR: folding 851b2fa into 7d78940 rewrites already-pushed commits, and this repo's git.history is `keep` (fr push never rewrites or forces). Mitigated instead by the discovery p1-bisect-note, carried into the PR body, naming both commits and the fix."
+  - id: p1-r6
+    state: fixed
+    body: "3194bda: reBuildStage accepts an optional @sha256:<hex> digest and the error names the digest form; TestParseBuildStage covers minor tag, patch tag, digest-pinned and a non-build stage."
   - id: p1-r7
     state: refuted
     body: "Verified by reverting the line and running golangci-lint v2.15.0: `internal/localterm/attacher_test.go:100:7: Error return value is not checked (errcheck)` on `case <-done:`. It is a real errcheck finding, and the change is its fix."
