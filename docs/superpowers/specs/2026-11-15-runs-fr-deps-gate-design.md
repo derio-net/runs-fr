@@ -38,7 +38,7 @@ R2. `k8s.io/api`, `k8s.io/apimachinery` and `k8s.io/client-go` move from v0.32.1
 R3. Every other module with a reachable vulnerability — at least `golang.org/x/net` and `github.com/moby/spdystream` — moves to a fixed version, `go mod tidy` leaves `go.mod`/`go.sum` clean, and CI's `go` job fails when it would not (`go mod tidy -diff`).
 R4. `govulncheck ./...` reports zero reachable vulnerabilities at the PR head.
 R5. `ci.yml` gains a `govulncheck` job that fails the workflow on any reachable vulnerability, with a pinned govulncheck version; it runs on every pull request and push the workflow already covers, under the same CI-authority gate as the existing jobs.
-R6. The same workflow also runs weekly against `main` (`schedule`) and on demand (`workflow_dispatch`, so the scheduled path can be exercised without waiting); when a scheduled `govulncheck` run fails on GitHub, it opens — or comments on, if one is already open — a `govulncheck: reachable vulnerability on main` issue, so a newly published advisory surfaces without anyone opening a PR.
+R6. The same workflow also runs weekly against `main` (`schedule`) and on demand (`workflow_dispatch`, so the scheduled path can be exercised without waiting); when a scheduled `govulncheck` run fails on GitHub, a schedule-only job opens — or comments on, if one is already open — a `govulncheck: reachable vulnerability on main` issue when the scan found a vulnerability (govulncheck exit 3), or a `govulncheck: scheduled scan failed on main` issue when the job failed otherwise, so a newly published advisory surfaces without anyone opening a PR and a broken scan is never reported as a vulnerability. Only that job holds `issues: write`.
 R7. `golangci-lint` is pinned to a release that supports Go 1.27, and the lint step passes.
 R8. A `renovate.json` at the repo root configures Renovate for gomod (with `go mod tidy` after updates), npm under `web/`, both Dockerfiles, and GitHub Actions, plus regex managers for the pinned pip packages in `test/e2e/Dockerfile`, the pinned govulncheck version and the pinned golangci-lint version in `ci.yml`; weekly schedule, a dependency dashboard, automerge off, and groups for `k8s.io/*`, `golang.org/x/*`, `@xterm/*`, GitHub Actions, and a `go toolchain` group that moves go.mod's `go`/`toolchain` lines, the Dockerfile's `golang` image and golangci-lint together.
 R9. The gateway's behaviour is unchanged: PR CI builds the image (build only, no push), and attaching to a pod through the deployed gateway works on the bumped client-go.
@@ -53,7 +53,12 @@ R11. The CI test step and `make test` both report per-package test coverage (`-c
 - `Dockerfile`: `FROM golang:1.27-alpine AS build`; the `:23` comment becomes
   "go.mod pins go 1.27".
 - `ci.yml` `go` job: `actions/setup-go@v5` with `go-version-file: go.mod`
-  (setup-go honours the `toolchain` line), `cache: true` kept.
+  `cache: true` kept. setup-go **v5** installs the `go` directive's version
+  (1.27.0), and `go` then fetches the `toolchain` line's go1.27.4 itself
+  (`GOTOOLCHAIN=auto`), so every command runs on go1.27.4 (the CI log's
+  `go version` lines confirm it). The cost is a noisy cache restore that
+  collides with the fetched toolchain. setup-go v6 reads `toolchain` directly;
+  that major bump is Renovate's first github-actions PR (R10), not this PR's.
 
 The toolchain bump goes first, before any module move: most of the 31 findings
 are stdlib and clear on it alone, and the module ladder then runs on a
@@ -89,17 +94,27 @@ there is adapted, never worked around by pinning below the rung.
   exercise the same path on demand. Neither interacts with the authority `if:`,
   which reads only `vars.CI_AUTHORITY` and `github.server_url`.
 - New job `govulncheck`, same `if:` authority expression as `go`/`helm`:
-  checkout → `actions/setup-go@v5` (`go-version-file: go.mod`) →
-  `go run golang.org/x/vuln/cmd/govulncheck@<pinned vX.Y.Z> ./...`.
-  govulncheck exits non-zero when it finds a reachable (symbol-level)
-  vulnerability, so the default mode IS the hard gate; no `continue-on-error`.
-  No Node step: the embed glob is satisfied by the tracked static files.
-- **Surfacing a scheduled failure (R6).** A final step in that job,
+  checkout (`persist-credentials: false`) → `actions/setup-go@v5`
+  (`go-version-file: go.mod`) →
+  `go install golang.org/x/vuln/cmd/govulncheck@<pinned vX.Y.Z>` → run the
+  installed binary, publishing its exit code as the job output `exit`.
+  Installed, not `go run`: `go run` reports every child failure as exit 1,
+  which would hide govulncheck's exit 3 (vulnerabilities found) behind its
+  exit 1 (tool error). govulncheck exits non-zero when it finds a reachable
+  (symbol-level) vulnerability, so the default mode IS the hard gate; no
+  `continue-on-error`. The job is `permissions: {contents: read}`. No Node
+  step: the embed glob is satisfied by the tracked static files.
+- **Surfacing a scheduled failure (R6).** A separate job `govulncheck-issue`,
+  `needs: govulncheck`,
   `if: failure() && github.event_name == 'schedule' && github.server_url == 'https://github.com'`,
-  runs `gh` to find an open issue titled
-  `govulncheck: reachable vulnerability on main` and comment the run URL on it,
-  or create it if none is open. The job alone gets `permissions: {contents: read, issues: write}`;
-  the workflow default stays `contents: read`. A red PR or push run already
+  `permissions: {issues: write}` and no checkout, reads
+  `needs.govulncheck.outputs.exit`. On exit 3 its title is
+  `govulncheck: reachable vulnerability on main`; on anything else (a checkout,
+  setup or vuln-DB failure, or no output at all) it is
+  `govulncheck: scheduled scan failed on main`. It runs `gh` to find an open
+  issue with that exact title and comment the run URL on it, or create it if
+  none is open. The scan job, which runs on every PR and push, never holds a
+  write scope; the workflow default stays `contents: read`. A red PR or push run already
   surfaces on the PR/commit; the issue exists for the run nobody is watching.
   Known limit: GitHub disables a schedule after 60 days without repository
   activity; a merged Renovate PR resets that, and the weekly
