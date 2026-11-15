@@ -3,7 +3,7 @@ run: 2026-11-15-feat-batch-runs-fr-deps-gate
 workflow: fr-goal@1
 branch: feat/batch-runs-fr-deps-gate
 started: '2026-11-15T06:22:31+00:00'
-cursor: implement
+cursor: journal-check
 steps:
   brainstorm:
     state: done
@@ -55,8 +55,8 @@ steps:
       \ a Test Plan line or a `verify: live` acceptance \nrow; keep a [manual] phase\
       \ only for a prerequisite or a real dispatch/deploy.\n"
   implement:
-    state: running
-    at: '2026-11-15T08:21:58+00:00'
+    state: done
+    at: '2026-11-15T08:30:40+00:00'
     members:
     - implement-phase
     - review-phase
@@ -119,13 +119,20 @@ steps:
           tests: ci:e29065ed03e0092c2ed5e371e42985d7d9e626f3+968f9072232a4bb915e3eaa22feb43e9fdb62fb6;tree=c1db16f77a50475a9adf0d2c45b61dc5e72fa0ff893a300f66ae32db5c8c6af6
           visual: none
       phase/2/review-phase:
-        state: running
+        state: done
         attempts:
         - dispatched: '2026-11-15T08:21:58+00:00'
           agent: ae95d7cfcc88fc259
           harness: claude-code
           model: claude-opus-5-5
           session: 8fb51872-215d-4dcb-9405-c4ec9b9d72c4
+          returned: '2026-11-15T08:30:40+00:00'
+          outcome: done
+        evidence:
+          review: p2-review-r1
+          reviewer: ae95d7cfcc88fc259
+          visual: none
+          findings: p2-r1,p2-r2,p2-r3,p2-r4,p2-r5
   journal-check:
     state: pending
   lens-review:

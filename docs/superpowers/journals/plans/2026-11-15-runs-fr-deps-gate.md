@@ -241,3 +241,59 @@ a single new JSON config file; nothing existing to clean
 ### no-refactor-p2-t2 · discovery · no-refactor-because P2.T2 (phase 2)
 
 verification-only task; no code written
+
+<!-- fr:journal kind=finding scope=plan id=p2-r1 created=2026-11-15T08:30:39+00:00 phase=2 state=open review_scope=in -->
+### p2-r1 · finding [open] (reviewer: in scope) · rangeStrategy bump moved the go directive on every patch (lookup proposed 1.27.0 -> 1.27.4) (phase 2)
+
+renovate.json:18. Contradicts the drift policy, drops the toolchain line under tidy, and breaks the image build under GOTOOLCHAIN=local when Docker Hub lags.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r2 created=2026-11-15T08:30:39+00:00 phase=2 state=open review_scope=in -->
+### p2-r2 · finding [open] (reviewer: in scope) · golangci-lint extracted twice (built-in github-actions uses-with + custom regex) on the same ci.yml line (phase 2)
+
+renovate.json:31-33; both land in the go toolchain group.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r3 created=2026-11-15T08:30:39+00:00 phase=2 state=open review_scope=in -->
+### p2-r3 · finding [open] (reviewer: in scope) · Dockerfile node:22-alpine and ci.yml setup-node "22" bumped in separate PRs, so Dockerfile:11's stated Node match can drift (phase 2)
+
+Lookup: renovate/node-26.x vs the github-actions major group.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r4 created=2026-11-15T08:30:39+00:00 phase=2 state=open review_scope=in -->
+### p2-r4 · finding [open] (reviewer: in scope) · go toolchain group had no minimumReleaseAge: a Go release seen before Docker Hub or golangci-lint catch up yields red PRs (phase 2)
+
+renovate.json:17.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r5 created=2026-11-15T08:30:39+00:00 phase=2 state=open review_scope=out -->
+### p2-r5 · finding [open] (reviewer: out of scope) · test/e2e/__pycache__/smoke.cpython-314.pyc is tracked in git (phase 2)
+
+Pre-existing tracked bytecode under a path Renovate now scans; not caused by this change. Remove it and gitignore __pycache__/.
+
+<!-- fr:journal kind=review scope=plan id=p2-review-r1 created=2026-11-15T08:30:39+00:00 phase=2 -->
+### p2-review-r1 · review · Phase 2 review r1: 5 findings (4 in, 1 out); 4 fixed, 1 out of scope (phase 2)
+
+Dispatched an independent read-only reviewer over 5da1b32..e29065e (renovate.json), against spec R8 and its drift policy, R1's pin invariant (test/pins) and R10. It ran the strict validator (both modes), --dry-run=extract and --dry-run=lookup in the devcontainer; confirmed every manager extracts, the go toolchain group pulls go/toolchain/golang/golangci-lint into one branch, the golangci regex matches ci.yml, nothing can automerge, and ignorePaths pulls in only test/e2e/Dockerfile.
+Received per superpowers:receiving-code-review: the orchestrator reproduced p2-r1 and p2-r3 with its own lookup dry run before changing anything. The reviewer's suggested p2-r1 fix (matchUpdateTypes patch + enabled: false) still left the 1.27.0 -> 1.27.3 update in the lookup output, so the fix uses allowedVersions /^\d+\.\d+\.0$/ instead, which removes it at lookup time (re-verified: go directive updates: []).
+
+<!-- fr:journal kind=finding scope=plan id=p2-r1-resolved created=2026-11-15T08:30:39+00:00 phase=2 state=fixed resolves=p2-r1 -->
+### p2-r1-resolved · finding [fixed] · resolves p2-r1: rangeStrategy bump moved the go directive on every patch (lookup proposed 1.27.0 -> 1.27.4) (phase 2)
+
+renovate.json: allowedVersions /^\d+\.\d+\.0$/ on the gomod golang depType alongside rangeStrategy bump. Re-ran --dry-run=lookup: the go directive now has no updates and the go-toolchain branch is gone (toolchain is already at 1.27.4); a new minor's .0 would still be proposed. Spec drift policy rewritten to match.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r2-resolved created=2026-11-15T08:30:39+00:00 phase=2 state=fixed resolves=p2-r2 -->
+### p2-r2-resolved · finding [fixed] · resolves p2-r2: golangci-lint extracted twice (built-in github-actions uses-with + custom regex) on the same ci.yml line (phase 2)
+
+renovate.json: packageRule disables the github-actions uses-with dep golangci/golangci-lint, leaving the spec's regex manager as the single tracker.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r3-resolved created=2026-11-15T08:30:39+00:00 phase=2 state=fixed resolves=p2-r3 -->
+### p2-r3-resolved · finding [fixed] · resolves p2-r3: Dockerfile node:22-alpine and ci.yml setup-node "22" bumped in separate PRs, so Dockerfile:11's stated Node match can drift (phase 2)
+
+renovate.json: {groupName: node, matchDepNames: [node]} after the github-actions rule. Lookup puts the Dockerfile node:22-alpine -> 26-alpine in renovate/major-node; the setup-node dep shares depName node but its lookup needs a GitHub token locally (skipReason github-token-required), so its grouping is by rule, to be seen on the hosted app.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r4-resolved created=2026-11-15T08:30:39+00:00 phase=2 state=fixed resolves=p2-r4 -->
+### p2-r4-resolved · finding [fixed] · resolves p2-r4: go toolchain group had no minimumReleaseAge: a Go release seen before Docker Hub or golangci-lint catch up yields red PRs (phase 2)
+
+renovate.json: minimumReleaseAge 7 days on the go toolchain group; the lookup now shows pendingVersions [1.27.4] held back by it, proving the rule applies.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r5-resolved created=2026-11-15T08:30:39+00:00 phase=2 state=open resolves=p2-r5 out_of_scope=true -->
+### p2-r5-resolved · finding [out-of-scope] · resolves p2-r5: test/e2e/__pycache__/smoke.cpython-314.pyc is tracked in git (phase 2)
+
+Pre-existing: the .pyc was committed before this change; this PR neither adds nor touches it. Filed as a follow-up at delivery.
