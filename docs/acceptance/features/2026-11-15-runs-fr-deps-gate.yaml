@@ -32,9 +32,13 @@ rows:
     origin:
     - spec:2026-11-15-runs-fr-deps-gate#R3
     - spec:2026-11-15-runs-fr-deps-gate#R4
-    levels: {}
-    status: not-implemented
-    notes: ''
+    levels:
+      int:
+      - runs-fr:.github/workflows/ci.yml#govulncheck
+      - runs-fr:.github/workflows/ci.yml#go
+    status: ci
+    notes: govulncheck job (pinned v1.9.0) and the go job's go mod tidy -diff step green
+      on the PR head
     verify: none
   - id: deps-gate-attach-works
     capability: Supported toolchain
