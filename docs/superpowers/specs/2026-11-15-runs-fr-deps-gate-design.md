@@ -205,3 +205,9 @@ Post-merge — operator-driven:
 2. Attach to a pod through the deployed gateway: an interactive shell opens, typed input echoes, a terminal resize takes effect, and exit closes the session cleanly.
 3. Run the `ci` workflow on `main` via `workflow_dispatch` and confirm the `govulncheck` job ran and passed; within a week of merge, confirm a `schedule`-triggered `ci` run on `main` ran the `govulncheck` job.
 4. Within a week of merge: the "Dependency Dashboard (runs-fr)" issue exists and lists dependencies from all four ecosystems (gomod, npm, dockerfile, github-actions); at least one Renovate PR has opened and its CI ran the `govulncheck` job.
+
+## Implementation Plans
+
+| Plan | Repo | File | Depends on |
+|------|------|------|------------|
+| 2026-11-15-runs-fr-deps-gate | `derio-net/runs-fr` | `2026-11-15-runs-fr-deps-gate` | — |

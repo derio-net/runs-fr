@@ -1,0 +1,195 @@
+schema_version: 2
+phase:
+  number: 1
+  title: Supported Go toolchain and the govulncheck gate (runs-fr#31,
+  tag: agentic
+  depends_on: []
+  tracking_issue: null
+  acceptance:
+  - deps-gate-supported-toolchain
+  - deps-gate-no-reachable-vulns
+  - deps-gate-vuln-gate-blocks
+  - deps-gate-attach-works
+  skeleton: true
+  tier: hard
+  files:
+  - go.mod
+  - go.sum
+  - Dockerfile
+  - Makefile
+  - .github/workflows/ci.yml
+  - .golangci.yml
+  - test/pins/*
+  - internal/*
+  - cmd/*
+  - docs/acceptance/features/2026-11-15-runs-fr-deps-gate.yaml
+  estimate_lines: 450
+tasks:
+- number: 1
+  title: Skeleton smoke — baseline suite and captured pre-bump govulncheck output
+  steps:
+  - id: P1.T1.S1
+    text: |-
+      On the unmodified tree, run `make frontend && go vet ./... && go test ./... -race` inside the workspace (`fr isolation exec`) and confirm it is green; this is the walking-skeleton smoke — the suite and toolchain run before anything moves.
+  - id: P1.T1.S2
+    text: |-
+      Pick the govulncheck pin: the newest non-prerelease `golang.org/x/vuln` from `go list -m -versions golang.org/x/vuln`. Run it against the PRE-bump tree under the old toolchain, `GOTOOLCHAIN=go1.23.4 go run golang.org/x/vuln/cmd/govulncheck@<pin> ./...`, capturing stdout+stderr and the exit code to a git-ignored scratch file. Expected: exit 3 (vulnerabilities found) and a list naming stdlib, golang.org/x/net and github.com/moby/spdystream findings. Record the exit code, the "Your code is affected by N vulnerabilities" count and the pin as a plan-journal discovery — this captured run is the evidence that the gate fails on a reachable vuln (row deps-gate-vuln-gate-blocks).
+- number: 2
+  title: Go 1.27 everywhere, guarded by a pin-agreement test (R1)
+  steps:
+  - id: P1.T2.S1
+    text: |-
+      RED: add `test/pins/pins_test.go` (package `pins`, stdlib only) with `TestGoVersionPinsAgree`, which reads `../../go.mod`, `../../Dockerfile` and `../../.github/workflows/ci.yml` and asserts: (a) the go.mod `go` directive and `toolchain` line share one minor; (b) the Dockerfile build stage is `golang:<that minor>-alpine`; (c) every `actions/setup-go` step in ci.yml uses `go-version-file: go.mod` and none sets a literal `go-version`; (d) that minor is at least 1.27. Run `go test ./test/pins/ -v`; expected FAIL on (c) and (d) against the 1.23 tree.
+  - id: P1.T2.S2
+    text: |-
+      GREEN: set go.mod to `go 1.27.0` / `toolchain go1.27.4`; Dockerfile line 25 to `FROM golang:1.27-alpine AS build` and its line-23 comment to "go.mod pins go 1.27"; ci.yml `go` job setup-go to `go-version-file: go.mod` (keep `cache: true`). Run `go mod tidy`, `go vet ./...`, `go test ./... -race`; all green including test/pins. Commit `build(go): move to Go 1.27 and read the CI version from go.mod`.
+  - id: P1.T2.S3
+    text: |-
+      REFACTOR: keep the pins test table-driven with one small parser per file and failure messages that name the file, the line and both versions, so a drifting Renovate PR is self-explanatory. Re-run `go test ./test/pins/ -v`.
+- number: 3
+  title: Ladder k8s.io/* one minor per commit to v0.37.x (R2)
+  steps:
+  - id: P1.T3.S1
+    text: |-
+      Rung 0.33: `go get k8s.io/api@v0.33.<latest> k8s.io/apimachinery@v0.33.<latest> k8s.io/client-go@v0.33.<latest>` (latest patch from `go list -m -versions k8s.io/client-go`), `go mod tidy`, `go vet ./...`, `go test ./... -race`. Adapt any API break in internal/term (exec.go, attacher.go, session.go) in the same rung. Green → commit `build(deps): k8s.io/* v0.33.<patch>`.
+  - id: P1.T3.S2
+    text: |-
+      Rung 0.34: same commands and commit shape for v0.34.<latest>; all three modules on the same version.
+  - id: P1.T3.S3
+    text: |-
+      Rung 0.35: same commands and commit shape for v0.35.<latest>.
+  - id: P1.T3.S4
+    text: |-
+      Rung 0.36: same commands and commit shape for v0.36.<latest>.
+  - id: P1.T3.S5
+    text: |-
+      Rung 0.37: same commands and commit shape for v0.37.<latest>. Confirm `internal/term/exec.go` still builds the WebSocket executor with the SPDY fallback via `remotecommand.NewFallbackExecutor(ws, spdy, httpstream.IsUpgradeFailure)` and that its tests pass; record any behavioural change found across the ladder as a plan-journal discovery.
+- number: 4
+  title: Clear the remaining reachable vulnerabilities (R3, R4)
+  steps:
+  - id: P1.T4.S1
+    text: |-
+      Run `go run golang.org/x/vuln/cmd/govulncheck@<pin> ./...` on the bumped tree. For each module it still names (at least golang.org/x/net and github.com/moby/spdystream unless the ladder already moved them), `go get <module>@latest`; then `go mod tidy`.
+  - id: P1.T4.S2
+    text: |-
+      Re-run govulncheck until it prints "No vulnerabilities found." and exits 0; run `go mod tidy -diff` (exit 0, no output), `go vet ./...`, `go test ./... -race`. Commit `build(deps): clear reachable vulnerabilities (x/net, spdystream, …)` naming every module moved.
+- number: 5
+  title: golangci-lint that supports Go 1.27 (R7)
+  steps:
+  - id: P1.T5.S1
+    text: |-
+      Find the newest golangci-lint v2.x release whose release notes / changelog state Go 1.27 support (`gh release list --repo golangci/golangci-lint` and the release body). Run it locally: `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@<vX.Y.Z> run`. Fix every real finding in the code; do not disable linters in .golangci.yml.
+  - id: P1.T5.S2
+    text: |-
+      Set ci.yml `golangci-lint-action@v9` `version:` to that exact `vX.Y.Z` (full patch, so the Renovate regex manager has a precise value to bump). Re-run lint locally; green. Commit `ci(lint): golangci-lint <vX.Y.Z> for Go 1.27`.
+- number: 6
+  title: CI vulnerability gate, weekly scan, tidy check, coverage and PR image build
+    (R3, R5, R6, R9, R11)
+  steps:
+  - id: P1.T6.S1
+    text: |-
+      RED: extend test/pins with a `TestCIGates` that reads ci.yml and asserts: `on:` includes `schedule` and `workflow_dispatch`; a `govulncheck` job exists, runs `golang.org/x/vuln/cmd/govulncheck@v<semver>` (a pinned version, never `@latest`), and has no `continue-on-error`; the `go` job runs `go mod tidy -diff` and its test step carries `-race -cover`; an `image` job runs docker/build-push-action with `push: false`. Run it; expected FAIL.
+  - id: P1.T6.S2
+    text: |-
+      GREEN: edit ci.yml — add `schedule: [{cron: "0 6 * * 1"}]` and `workflow_dispatch:` to `on:`; in the `go` job add a `tidy` step `go mod tidy -diff` after setup-go and change test to `go test ./... -race -cover`; add job `govulncheck` (authority `if:` identical to `go`/`helm`; `permissions: {contents: read, issues: write}`; checkout@v4 → setup-go@v5 with `go-version-file: go.mod` → `go run golang.org/x/vuln/cmd/govulncheck@<pin> ./...`) with a final step `if: failure() && github.event_name == 'schedule' && github.server_url == 'https://github.com'` that uses `gh` (env GH_TOKEN: github.token) to comment the run URL on the open issue titled `govulncheck: reachable vulnerability on main`, or create it when none is open; add job `image` (same authority `if:`; checkout@v4 → docker/setup-buildx-action@v3 → docker/build-push-action@v6 with `context: .`, `push: false`). Change Makefile `test` to `go test ./... -race -cover`. Run `go test ./... -race -cover`; green including TestCIGates.
+  - id: P1.T6.S3
+    text: |-
+      Validate the workflow: `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/ci.yml` exits 0. Commit `ci: govulncheck hard gate, weekly scan with issue-on-failure, tidy check, coverage, PR image build`.
+  - id: P1.T6.S4
+    text: |-
+      REFACTOR: dedupe the authority `if:` expression only if GitHub Actions allows it without changing behaviour (it does not support YAML anchors across jobs, so most likely keep it repeated and say so in the step record); keep comments in ci.yml explaining why the govulncheck job needs no Node step (tracked static files satisfy the embed glob) and why issues: write is job-scoped.
+- number: 7
+  title: Prove it on the PR and move the acceptance rows
+  steps:
+  - id: P1.T7.S1
+    text: |-
+      Push (`fr push`) and confirm on the draft PR that the `go`, `govulncheck`, `image` and `helm` jobs all complete green on the pushed head (`gh pr checks`). This is the tests: ci evidence for the phase.
+  - id: P1.T7.S2
+    text: |-
+      Move rows: `fr acceptance set-status --id deps-gate-supported-toolchain --status ci --level ci=derio-net/runs-fr:.github/workflows/ci.yml#go --level ci=derio-net/runs-fr:.github/workflows/ci.yml#image --level unit=derio-net/runs-fr:test/pins/pins_test.go#TestGoVersionPinsAgree --notes "go and image jobs green on the PR head; pin test guards drift"` and `deps-gate-no-reachable-vulns` to `ci` with the `govulncheck` job and the tidy step as levels. Leave `deps-gate-vuln-gate-blocks` and `deps-gate-attach-works` at their live verification (post-merge Test Plan), adding the govulncheck job / TestCIGates as levels where `set-status` allows without moving status.
+state:
+  steps:
+    P1.T1.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T1.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T2.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T2.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T2.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T3.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T3.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T3.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T3.S4:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T3.S5:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T4.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T4.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T5.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T5.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T6.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T6.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T6.S3:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T6.S4:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T7.S1:
+      state: ' '
+      ticked_at: null
+      note: null
+    P1.T7.S2:
+      state: ' '
+      ticked_at: null
+      note: null
+  completion:
+    at: null
+    note: null
+    observed_prs: []
