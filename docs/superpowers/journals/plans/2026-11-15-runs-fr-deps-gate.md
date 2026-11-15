@@ -440,3 +440,8 @@ Filed at deliver as https://github.com/derio-net/runs-fr/issues/48.
 ### l-security-r2-resolved-2 · finding [deferred → https://github.com/derio-net/runs-fr/issues/49] · resolves l-security-r2: debt job checkout persists the FR_DEBT_TOKEN PAT in .git/config
 
 Filed at deliver as https://github.com/derio-net/runs-fr/issues/49.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r3-resolved-2 created=2026-11-15T08:40:37+00:00 state=open resolves=l-security-r3 tracked_by=https://github.com/derio-net/runs-fr/issues/50 -->
+### l-security-r3-resolved-2 · finding [deferred → https://github.com/derio-net/runs-fr/issues/50] · resolves l-security-r3: astral-sh/setup-uv@v5 is tag-pinned in write-scoped jobs
+
+Filed at deliver as https://github.com/derio-net/runs-fr/issues/50.
