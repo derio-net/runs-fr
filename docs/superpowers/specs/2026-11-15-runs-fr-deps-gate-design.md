@@ -151,6 +151,7 @@ the new version reports findings; real findings are fixed, not disabled.
   "schedule": ["before 6am on monday"],
   "timezone": "Etc/UTC",
   "automerge": false,
+  "minimumReleaseAge": "3 days",
   "dependencyDashboard": {"enabled": true, "title": "Dependency Dashboard (runs-fr)"},
   "ignorePresets": [":ignoreModulesAndTests"],
   "ignorePaths": ["**/node_modules/**", "**/bower_components/**", "**/vendor/**"],
@@ -174,7 +175,7 @@ the new version reports findings; real findings are fixed, not disabled.
      "matchStrings": ["golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v[0-9.]+)"],
      "depNameTemplate": "golang.org/x/vuln", "datasourceTemplate": "go"},
     {"customType": "regex", "managerFilePatterns": ["/^\\.github/workflows/ci\\.ya?ml$/"],
-     "matchStrings": ["golangci-lint-action@\\S+\\s+with:\\s+version:\\s*(?<currentValue>v[0-9.]+)"],
+     "matchStrings": ["golangci-lint-action@\\S+(?:[ \\t]+#[^\\n]*)?\\s+with:\\s+version:\\s*(?<currentValue>v[0-9.]+)"],
      "depNameTemplate": "golangci/golangci-lint", "datasourceTemplate": "github-releases"}
   ]
 }
