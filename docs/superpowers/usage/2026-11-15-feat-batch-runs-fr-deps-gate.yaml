@@ -1,0 +1,58 @@
+schema_version: 2
+run: 2026-11-15-feat-batch-runs-fr-deps-gate
+captures:
+- host: h-b59daaee
+  harness: claude-code
+  mode: devcontainer
+  captured_at: '2026-11-15T07:03:20+00:00'
+  at:
+  - resolve:brainstorm
+  sessions:
+  - session: 8fb51872-215d-4dcb-9405-c4ec9b9d72c4
+    role: main
+    models:
+      claude-opus-5-5:
+        input: 92
+        cache_write: 113897
+        cache_read: 4269495
+        output: 27678
+        usd: null
+        usd_source: none
+    activity:
+      other:
+        usd: null
+        turns: 31
+      paperwork:
+        usd: null
+        turns: 10
+    steps:
+      (outside run):
+        usd: null
+        turns: 20
+        input: 48
+        cache_write: 69202
+        cache_read: 1721689
+        output: 7390
+      brainstorm:
+        usd: null
+        turns: 21
+        input: 44
+        cache_write: 44695
+        cache_read: 2547806
+        output: 20288
+    steps_by_role:
+      main:
+        (outside run):
+          usd: null
+          turns: 20
+          input: 48
+          cache_write: 69202
+          cache_read: 1721689
+          output: 7390
+        brainstorm:
+          usd: null
+          turns: 21
+          input: 44
+          cache_write: 44695
+          cache_read: 2547806
+          output: 20288
