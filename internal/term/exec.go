@@ -4,11 +4,11 @@ import (
 	"net/url"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 // BuildExecURL constructs the method-agnostic *url.URL for a tmux attach against
@@ -46,6 +46,11 @@ func BuildExecURL(clientset kubernetes.Interface, namespace, pod, sessionName st
 // back to SPDY when the cluster rejects the websocket upgrade — covering older
 // API servers. The websocket executor upgrades with GET and takes a URL string;
 // the SPDY executor uses POST and a *url.URL.
+//
+// The fallback predicate must come from k8s.io/streaming/pkg/httpstream: since
+// client-go v0.36 the WebSocket transport returns that package's
+// UpgradeFailureError, which the deprecated apimachinery httpstream copy does
+// not recognise — with it, the SPDY fallback silently never fires.
 func NewExecutor(cfg *rest.Config, u *url.URL) (remotecommand.Executor, error) {
 	ws, err := remotecommand.NewWebSocketExecutor(cfg, "GET", u.String())
 	if err != nil {
