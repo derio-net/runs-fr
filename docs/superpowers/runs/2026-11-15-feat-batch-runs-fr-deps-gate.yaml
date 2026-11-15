@@ -3,7 +3,7 @@ run: 2026-11-15-feat-batch-runs-fr-deps-gate
 workflow: fr-goal@1
 branch: feat/batch-runs-fr-deps-gate
 started: '2026-11-15T06:22:31+00:00'
-cursor: lens-review
+cursor: deliver
 steps:
   brainstorm:
     state: done
@@ -140,8 +140,8 @@ steps:
     stdout: |
       1 out-of-scope finding(s): p2-r5
   lens-review:
-    state: running
-    at: '2026-11-15T08:30:45+00:00'
+    state: done
+    at: '2026-11-15T08:39:13+00:00'
     units:
       step/lens-review:
         attempts:
@@ -149,6 +149,13 @@ steps:
           harness: claude-code
           model: claude-opus-5-5
           session: 8fb51872-215d-4dcb-9405-c4ec9b9d72c4
+          returned: '2026-11-15T08:39:13+00:00'
+          outcome: done
+        evidence:
+          review: lens-review-r1
+          reviewer: security=a1b5bddd7d1e08775,tests=adfc56af60855cf16
+          findings: l-security-r1,l-security-r2,l-security-r3,l-security-r4,l-security-r5,l-security-r6,l-tests-r1,l-tests-r2,l-tests-r3,l-tests-r4,l-tests-r5,l-tests-r6
+          lenses: security=18:l-security-r1,l-security-r2,l-security-r3,l-security-r4,l-security-r5,l-security-r6;tests=11:l-tests-r1,l-tests-r2,l-tests-r3,l-tests-r4,l-tests-r5,l-tests-r6
   deliver:
     state: pending
 fr_version: 7.0.0rc2

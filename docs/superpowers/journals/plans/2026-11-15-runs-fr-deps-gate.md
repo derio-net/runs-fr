@@ -297,3 +297,131 @@ renovate.json: minimumReleaseAge 7 days on the go toolchain group; the lookup no
 ### p2-r5-resolved · finding [out-of-scope] · resolves p2-r5: test/e2e/__pycache__/smoke.cpython-314.pyc is tracked in git (phase 2)
 
 Pre-existing: the .pyc was committed before this change; this PR neither adds nor touches it. Filed as a follow-up at delivery.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r1 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-security-r1 · finding [open] (reviewer: in scope) · acceptance-report.yml installs fr from mutable @main and runs it in the write-scoped debt and pages jobs
+
+.github/workflows/acceptance-report.yml:46,91,140 — `uv tool install git+https://github.com/derio-net/super-fr@main…` in jobs holding contents/issues/pull-requests write + FR_DEBT_TOKEN (debt) and pages/id-token write (pages).
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r2 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-security-r2 · finding [open] (reviewer: in scope) · debt job checkout persists the FR_DEBT_TOKEN PAT in .git/config
+
+.github/workflows/acceptance-report.yml:134-137 — checkout with `token: secrets.FR_DEBT_TOKEN || github.token` and no `persist-credentials: false`, exposing the PAT to later steps.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r3 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-security-r3 · finding [open] (reviewer: in scope) · astral-sh/setup-uv@v5 is tag-pinned in write-scoped jobs
+
+.github/workflows/acceptance-report.yml:89,138 — a movable tag runs with write scopes and the PAT.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r4 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-security-r4 · finding [open] (reviewer: in scope) · devcontainer postCreateCommand curl|sh's an unversioned uv installer
+
+.devcontainer/dev/devcontainer.json:9 — `curl … https://astral.sh/uv/install.sh | sh`, then fr from unpinned super-fr default branch, sudo-linked into /usr/local/bin.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r5 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-security-r5 · finding [open] (reviewer: in scope) · renovate.json set minimumReleaseAge only for the Go toolchain group
+
+renovate.json:18 — gomod/npm/actions updates had no release-age quarantine before PR CI runs their install scripts.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r6 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-security-r6 · finding [open] (reviewer: in scope) · acceptance-report debt and pages jobs lacked the CI-authority gate
+
+.github/workflows/acceptance-report.yml:68,126 — write-scoped jobs would run on the Gitea mirror.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r1 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-tests-r1 · finding [open] (reviewer: in scope) · ci_gates_test substring checks matched comments and no-ops
+
+test/pins/ci_gates_test.go:23-68 kept comment lines in blocks; the reviewer's mutation run commented out tidy, persist-credentials, the exit output and push: false, and TestCIGates stayed green.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r2 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-tests-r2 · finding [open] (reviewer: in scope) · parseGoMod treated a present-but-unparsable toolchain line as absent
+
+test/pins/pins_test.go:78,92-96 — `toolchain go1.28rc1`, `toolchain go1.28.1 // pinned`, `toolchain  go1.28.1-custom` returned toolchain=1.27.0, passing real minor drift.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r3 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-tests-r3 · finding [open] (reviewer: in scope) · govulncheck gate test never asserted the scan propagates its exit code
+
+test/pins/ci_gates_test.go:99-127 — after `set +e`, `exit 0` or `|| true` passed every check.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r4 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-tests-r4 · finding [open] (reviewer: in scope) · TestGoVersionPinsAgree only ran on agreeing live files
+
+test/pins/pins_test.go:171-213 — no drifting input was ever fed to the comparison or to setupGoSteps.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r5 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-tests-r5 · finding [open] (reviewer: in scope) · renovate.json golangci-lint regex stopped matching a digest-pinned action line
+
+renovate.json:29 — `@\S+\s+with:` fails on `uses: …@<sha> # v9`, silently dropping the linter from the go toolchain group.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r6 created=2026-11-15T08:39:12+00:00 state=open review_scope=in -->
+### l-tests-r6 · finding [open] (reviewer: in scope) · trigger test accepted an empty `schedule:` key
+
+test/pins/ci_gates_test.go:91-97 — no assertion that a `- cron:` entry exists for the weekly scan.
+
+<!-- fr:journal kind=review scope=plan id=lens-review-r1 created=2026-11-15T08:39:12+00:00 -->
+### lens-review-r1 · review · Lens review r1 (security, tests): 12 findings; 9 fixed, 3 out of scope (reclassified from in)
+
+One read-only reviewer per lens over 968f907..HEAD, each given only its lens brief and return rule.
+security: Go/client-go change clean (fallback predicate swap, k8s.io/streaming official, httptest-only test); ci.yml govulncheck / govulncheck-issue split, image job and govulncheck pin confirmed sound. Raised l-security-r1..r6, all in acceptance-report.yml, the devcontainer and renovate.json.
+tests: confirmed the SPDY fallback test fails with the old predicate (methods=[GET]); proved by mutation in a /tmp copy that four gates could be commented out with TestCIGates green. Raised l-tests-r1..r6.
+Fixes: checks became pure functions over comment-stripped lines, anchored to key lines and job `if:` values; mutation_test.go applies each weakening (the reviewer's four mutations, exit 0, || true, empty schedule, if: moved into a comment, issues: write regained, every pin drift, an unparsable toolchain) to the LIVE files and requires a failure, and the consistent shapes cmd/go and Renovate write (toolchain dropped, toolchain comment, digest-pinned stage and setup-go) to pass. Full suite, golangci-lint (0 issues), govulncheck (none), actionlint and renovate-config-validator --strict all green after.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r1-resolved created=2026-11-15T08:39:12+00:00 state=open resolves=l-security-r1 out_of_scope=true -->
+### l-security-r1-resolved · finding [out-of-scope] · resolves l-security-r1: acceptance-report.yml installs fr from mutable @main and runs it in the write-scoped debt and pages jobs
+
+Reclassified from in: the unpinned `fr@main` install is super-fr's shipped acceptance-report template, which `fr acceptance init` wrote verbatim into this PR (2eca737) and writes into every fr repo; the defect is the template's, not this feature's design, and patching one consumer's copy forks a generated file the next fr upgrade rewrites. Filed as a follow-up for the super-fr template.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r2-resolved created=2026-11-15T08:39:12+00:00 state=open resolves=l-security-r2 out_of_scope=true -->
+### l-security-r2-resolved · finding [out-of-scope] · resolves l-security-r2: debt job checkout persists the FR_DEBT_TOKEN PAT in .git/config
+
+Reclassified from in: same super-fr template origin as l-security-r1. Turning off persisted credentials in runs-fr alone risks silently breaking `fr debt archive-pr`'s push, which only a scheduled run on merged main can exercise. Filed as a follow-up for the super-fr template.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r3-resolved created=2026-11-15T08:39:12+00:00 state=open resolves=l-security-r3 out_of_scope=true -->
+### l-security-r3-resolved · finding [out-of-scope] · resolves l-security-r3: astral-sh/setup-uv@v5 is tag-pinned in write-scoped jobs
+
+Reclassified from in: same super-fr template origin as l-security-r1 (the tag-pinned setup-uv is the template's). Filed as a follow-up for the super-fr template; Renovate's github-actions group will at least keep the tag current.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r4-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-security-r4 -->
+### l-security-r4-resolved · finding [fixed] · resolves l-security-r4: devcontainer postCreateCommand curl|sh's an unversioned uv installer
+
+2f02e92 pins the installer to https://astral.sh/uv/0.13.6/install.sh (resolves to the fixed release asset). The unpinned fr install from super-fr's default branch predates this change (the previous postCreateCommand did the same) and is left as it was.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r5-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-security-r5 -->
+### l-security-r5-resolved · finding [fixed] · resolves l-security-r5: renovate.json set minimumReleaseAge only for the Go toolchain group
+
+70544d8 adds a global minimumReleaseAge: 3 days (validator --strict passes); the go toolchain group keeps 7 days.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r6-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-security-r6 -->
+### l-security-r6-resolved · finding [fixed] · resolves l-security-r6: acceptance-report debt and pages jobs lacked the CI-authority gate
+
+258f2e7: debt carries the CI-authority expression; pages is GitHub-only (server_url and CI_AUTHORITY == github). actionlint clean.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r1-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-tests-r1 -->
+### l-tests-r1-resolved · finding [fixed] · resolves l-tests-r1: ci_gates_test substring checks matched comments and no-ops
+
+13ef927: stripYAMLComment drops whole-line and ` #…` tails outside quotes before childBlocksIn parses; tidy, push: false, persist-credentials and issues: write match anchored key lines; the issue job's conditions are read from its `if:` value. TestCIGateProblemsCatchMutations includes all four of the reviewer's mutations.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r2-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-tests-r2 -->
+### l-tests-r2-resolved · finding [fixed] · resolves l-tests-r2: parseGoMod treated a present-but-unparsable toolchain line as absent
+
+13ef927: reToolchain accepts rc/beta and a trailing `// comment`; any other `toolchain` line is an error, and only a missing line falls back. TestPinProblemsCatchDrift covers rc on a newer minor, a commented newer minor, an unparsable suffix (all must fail) and a same-minor patch with a comment (must pass).
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r3-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-tests-r3 -->
+### l-tests-r3-resolved · finding [fixed] · resolves l-tests-r3: govulncheck gate test never asserted the scan propagates its exit code
+
+13ef927: reScanPropagates requires the installed binary, rc=$? immediately after, the exit= output and `exit "$rc"`; reSwallowed rejects `|| true` and `exit 0`. Mutations 'scan always exits 0' and 'scan failure swallowed' must fail.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r4-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-tests-r4 -->
+### l-tests-r4-resolved · finding [fixed] · resolves l-tests-r4: TestGoVersionPinsAgree only ran on agreeing live files
+
+13ef927: comparisons moved into pinProblems(goMod, dockerfile, ci []string) and setupGoStepsIn(lines); TestPinProblemsCatchDrift feeds it go-directive, toolchain, Dockerfile and literal go-version drift, a commented-out go-version-file and a below-floor go.mod (must fail), and a digest-pinned setup-go (must pass).
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r5-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-tests-r5 -->
+### l-tests-r5-resolved · finding [fixed] · resolves l-tests-r5: renovate.json golangci-lint regex stopped matching a digest-pinned action line
+
+bc0d893: the regex allows an optional `[ \t]+#…` tail after the action ref; TestRenovateGolangciRegexMatches loads renovate.json's own pattern and requires currentValue v2.15.0 from ci.yml and from its digest-pinned shape (red before, green after). Renovate extraction still finds the dep.
+
+<!-- fr:journal kind=finding scope=plan id=l-tests-r6-resolved created=2026-11-15T08:39:12+00:00 state=fixed resolves=l-tests-r6 -->
+### l-tests-r6-resolved · finding [fixed] · resolves l-tests-r6: trigger test accepted an empty `schedule:` key
+
+13ef927: reCron requires a `- cron: "…"` entry under schedule; mutation 'schedule left with no cron' must fail.
