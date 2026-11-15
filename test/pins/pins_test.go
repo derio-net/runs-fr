@@ -2,6 +2,9 @@
 // files: go.mod, the Dockerfile's Go build stage, and CI's setup-go steps. A
 // drifting Renovate PR fails here with a message naming the file, the line and
 // both versions.
+//
+// Every check is a pure function over a file's lines, so mutation_test.go can
+// prove each one against a mutated copy of the live file.
 package pins
 
 import (
@@ -64,18 +67,43 @@ func findFirstIn(path string, lines []string, re *regexp.Regexp) (pin, bool) {
 	return pin{}, false
 }
 
-// minorOf reduces "1.27.0" or "1.27" to "1.27".
+var reMinor = regexp.MustCompile(`^(\d+)\.(\d+)`)
+
+// minorOf reduces "1.27.0", "1.27" or "1.28rc1" to its minor ("1.27", "1.28").
 func minorOf(v string) string {
-	parts := strings.SplitN(v, ".", 3)
-	if len(parts) < 2 {
-		return v
+	if m := reMinor.FindStringSubmatch(v); m != nil {
+		return m[1] + "." + m[2]
 	}
-	return parts[0] + "." + parts[1]
+	return v
+}
+
+// stripYAMLComment drops a YAML comment: a whole-line `#…`, or a ` #…` tail
+// outside quotes. Checks then match only what the workflow actually runs.
+func stripYAMLComment(l string) string {
+	if strings.HasPrefix(strings.TrimSpace(l), "#") {
+		return ""
+	}
+	var quote rune
+	for i, r := range l {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case r == '"' || r == '\'':
+			quote = r
+		case r == '#' && i > 0 && (l[i-1] == ' ' || l[i-1] == '\t'):
+			return strings.TrimRight(l[:i], " \t")
+		}
+	}
+	return l
 }
 
 var (
-	reGoDirective = regexp.MustCompile(`^go\s+(\d+\.\d+(?:\.\d+)?)\s*$`)
-	reToolchain   = regexp.MustCompile(`^toolchain\s+go(\d+\.\d+(?:\.\d+)?)\s*$`)
+	// go.mod allows a trailing `// comment` on either line.
+	reGoDirective = regexp.MustCompile(`^go\s+(\d+\.\d+(?:\.\d+)?)\s*(?://.*)?$`)
+	reToolchain   = regexp.MustCompile(`^toolchain\s+go(\d+\.\d+(?:\.\d+)?(?:(?:rc|beta)\d+)?)\s*(?://.*)?$`)
+	reToolchainKw = regexp.MustCompile(`^toolchain\b`)
 	// An optional @sha256 digest: Renovate's dockerfile manager writes one
 	// when digest pinning is on.
 	reBuildStage = regexp.MustCompile(`^FROM\s+golang:(\d+\.\d+(?:\.\d+)?)-alpine(?:@sha256:[0-9a-f]+)?\s+AS\s+build\b`)
@@ -83,17 +111,23 @@ var (
 
 // parseGoMod returns go.mod's go directive and its toolchain. cmd/go omits a
 // `toolchain` line equal to the go directive (and `go mod tidy` removes one),
-// so a missing line means "the go directive's version", never an error.
+// so a MISSING line means "the go directive's version". A present line that
+// does not parse is an error: falling back there would hide real drift.
 func parseGoMod(path string, lines []string) (goDir, toolchain pin, err error) {
 	goDir, ok := findFirstIn(path, lines, reGoDirective)
 	if !ok {
 		return pin{}, pin{}, fmt.Errorf("%s: no `go X.Y[.Z]` directive", path)
 	}
-	toolchain, ok = findFirstIn(path, lines, reToolchain)
-	if !ok {
-		toolchain = goDir
-		toolchain.text += " (no toolchain line: it equals the go directive)"
+	if toolchain, ok = findFirstIn(path, lines, reToolchain); ok {
+		return goDir, toolchain, nil
 	}
+	for i, l := range lines {
+		if reToolchainKw.MatchString(l) {
+			return pin{}, pin{}, fmt.Errorf("%s:%d %q: unparsable toolchain line (want `toolchain goX.Y[.Z][rcN]`)", path, i+1, strings.TrimSpace(l))
+		}
+	}
+	toolchain = goDir
+	toolchain.text += " (no toolchain line: it equals the go directive)"
 	return goDir, toolchain, nil
 }
 
@@ -106,26 +140,6 @@ func parseBuildStage(path string, lines []string) (pin, error) {
 	return p, nil
 }
 
-// goModPins parses the repo's go.mod; see parseGoMod.
-func goModPins(t *testing.T) (goDir, toolchain pin) {
-	t.Helper()
-	goDir, toolchain, err := parseGoMod(goModPath, readLines(t, goModPath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return goDir, toolchain
-}
-
-// dockerBuildStage parses the repo's Dockerfile; see parseBuildStage.
-func dockerBuildStage(t *testing.T) pin {
-	t.Helper()
-	p, err := parseBuildStage(dockerfilePath, readLines(t, dockerfilePath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return p
-}
-
 // setupGoStep is one actions/setup-go step in a workflow and its `with:` keys.
 type setupGoStep struct {
 	line int
@@ -136,21 +150,20 @@ var reIndent = regexp.MustCompile(`^(\s*)`)
 
 func indentOf(l string) int { return len(reIndent.FindString(l)) }
 
-// setupGoSteps finds every `uses: actions/setup-go@…` step in a workflow and
-// collects the scalar keys of its `with:` block (a line-oriented parse; the
-// workflow files are plain block YAML).
-func setupGoSteps(t *testing.T, path string) []setupGoStep {
-	t.Helper()
-	lines := readLines(t, path)
+// setupGoStepsIn finds every `uses: actions/setup-go@…` step (a tag or a
+// digest-pinned `@<sha> # vX`) and collects the scalar keys of its `with:`
+// block, comments stripped (a line-oriented parse of plain block YAML).
+func setupGoStepsIn(path string, lines []string) []setupGoStep {
 	var steps []setupGoStep
-	for i, l := range lines {
+	for i, raw := range lines {
+		l := stripYAMLComment(raw)
 		if !strings.Contains(l, "uses: actions/setup-go@") {
 			continue
 		}
 		st := setupGoStep{line: i + 1, with: map[string]pin{}}
 		usesIndent := indentOf(strings.Replace(l, "- ", "  ", 1))
 		for j := i + 1; j < len(lines); j++ {
-			lj := lines[j]
+			lj := stripYAMLComment(lines[j])
 			if strings.TrimSpace(lj) == "" {
 				continue
 			}
@@ -168,46 +181,44 @@ func setupGoSteps(t *testing.T, path string) []setupGoStep {
 	return steps
 }
 
-func TestGoVersionPinsAgree(t *testing.T) {
-	goDir, toolchain := goModPins(t)
-	stage := dockerBuildStage(t)
+// pinProblems reports every way go.mod, the Dockerfile and ci.yml disagree on
+// the Go minor, or fall below the supported floor. Empty means consistent.
+func pinProblems(goMod, dockerfile, ci []string) []string {
+	var probs []string
+	goDir, toolchain, err := parseGoMod(goModPath, goMod)
+	if err != nil {
+		return append(probs, err.Error())
+	}
 	minor := minorOf(goDir.ver)
-
-	checks := []struct {
-		name string
-		got  pin
-	}{
-		{"go.mod toolchain line shares the go directive's minor", toolchain},
-		{"Dockerfile build stage uses golang:<go.mod minor>-alpine", stage},
+	if got := minorOf(toolchain.ver); got != minor {
+		probs = append(probs, fmt.Sprintf("%s has Go %s, but %s declares minor %s", toolchain, got, goDir, minor))
 	}
-	for _, c := range checks {
-		t.Run(c.name, func(t *testing.T) {
-			if minorOf(c.got.ver) != minor {
-				t.Errorf("%s has Go %s, but %s declares minor %s", c.got, minorOf(c.got.ver), goDir, minor)
-			}
-		})
+	if stage, err := parseBuildStage(dockerfilePath, dockerfile); err != nil {
+		probs = append(probs, err.Error())
+	} else if got := minorOf(stage.ver); got != minor {
+		probs = append(probs, fmt.Sprintf("%s has Go %s, but %s declares minor %s", stage, got, goDir, minor))
 	}
+	steps := setupGoStepsIn(ciPath, ci)
+	if len(steps) == 0 {
+		probs = append(probs, ciPath+": no actions/setup-go step found")
+	}
+	for _, st := range steps {
+		if lit, ok := st.with["go-version"]; ok {
+			probs = append(probs, fmt.Sprintf("%s sets a literal go-version %s; go.mod (%s) says %s — use `go-version-file: go.mod`", lit, lit.ver, goDir, minor))
+		}
+		if f, ok := st.with["go-version-file"]; !ok || f.ver != "go.mod" {
+			probs = append(probs, fmt.Sprintf("%s:%d: setup-go step has no `go-version-file: go.mod`", ciPath, st.line))
+		}
+	}
+	parts := strings.SplitN(minor, ".", 2)
+	if n, err := strconv.Atoi(parts[len(parts)-1]); err != nil || parts[0] != "1" || n < minGoMinor {
+		probs = append(probs, fmt.Sprintf("%s declares Go %s; the oldest allowed minor is 1.%d", goDir, minor, minGoMinor))
+	}
+	return probs
+}
 
-	t.Run("ci.yml setup-go reads go.mod, never a literal", func(t *testing.T) {
-		steps := setupGoSteps(t, ciPath)
-		if len(steps) == 0 {
-			t.Fatalf("%s: no actions/setup-go step found", ciPath)
-		}
-		for _, st := range steps {
-			if lit, ok := st.with["go-version"]; ok {
-				t.Errorf("%s sets a literal go-version %s; go.mod (%s) says %s — use `go-version-file: go.mod`", lit, lit.ver, goDir, minor)
-			}
-			if f, ok := st.with["go-version-file"]; !ok || f.ver != "go.mod" {
-				t.Errorf("%s:%d: setup-go step has no `go-version-file: go.mod`", ciPath, st.line)
-			}
-		}
-	})
-
-	t.Run("Go minor is supported", func(t *testing.T) {
-		parts := strings.SplitN(minor, ".", 2)
-		n, err := strconv.Atoi(parts[len(parts)-1])
-		if err != nil || parts[0] != "1" || n < minGoMinor {
-			t.Errorf("%s declares Go %s; the oldest allowed minor is 1.%d", goDir, minor, minGoMinor)
-		}
-	})
+func TestGoVersionPinsAgree(t *testing.T) {
+	for _, p := range pinProblems(readLines(t, goModPath), readLines(t, dockerfilePath), readLines(t, ciPath)) {
+		t.Error(p)
+	}
 }
