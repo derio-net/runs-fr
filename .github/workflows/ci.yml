@@ -5,6 +5,13 @@ on:
     # sync-* branches exist only on the Gitea mirror (re-run triggers).
     branches: [main, 'sync-pr-**', 'sync-rerun-**']
   pull_request:
+  # Weekly run on main, so a newly published advisory (govulncheck) or a
+  # changed environment surfaces without anyone opening a PR. Neither trigger
+  # interacts with the authority `if:`, which reads only vars and server_url.
+  schedule:
+    - cron: "0 6 * * 1" # Monday 06:00 UTC
+  # On-demand, to exercise the scheduled path without waiting for Monday.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,6 +29,10 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # Fails on any go.mod/go.sum drift — also guards Renovate PRs.
+      - name: tidy
+        run: go mod tidy -diff
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -35,12 +46,72 @@ jobs:
         run: go vet ./...
 
       - name: test
-        run: go test ./... -race
+        run: go test ./... -race -cover
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+
+  govulncheck:
+    # Same authority gate as go/helm (Actions has no cross-job YAML anchors).
+    if: (vars.CI_AUTHORITY || 'github') == (github.server_url == 'https://github.com' && 'github' || 'gitea')
+    runs-on: ubuntu-latest
+    # issues: write is scoped to this job alone, for the scheduled-failure
+    # issue below; the workflow default stays contents: read.
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # No Node step: cmd/runs-fr embeds static/*, and the tracked
+      # static/index.html and static/xterm.css satisfy the glob without the
+      # built bundle.js. govulncheck exits non-zero on any reachable
+      # (symbol-level) vulnerability, so the default mode is the hard gate.
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+      # A red PR/push run already shows on the PR or commit; this is for the
+      # weekly run nobody is watching. GitHub only (the Gitea mirror has no
+      # issues to file into).
+      - name: open or comment the vulnerability issue
+        if: failure() && github.event_name == 'schedule' && github.server_url == 'https://github.com'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "govulncheck: reachable vulnerability on main"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number,title \
+            | jq -r --arg t "$TITLE" '[.[] | select(.title == $t)][0].number // empty')
+          body="The scheduled govulncheck run on main failed: $RUN_URL"
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$body"
+          fi
+
+  image:
+    # Builds the image on every PR (build.yml builds only on push to main), so
+    # a broken Dockerfile fails before merge. Build only, never pushed.
+    if: (vars.CI_AUTHORITY || 'github') == (github.server_url == 'https://github.com' && 'github' || 'gitea')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
 
   helm:
     if: (vars.CI_AUTHORITY || 'github') == (github.server_url == 'https://github.com' && 'github' || 'gitea')
