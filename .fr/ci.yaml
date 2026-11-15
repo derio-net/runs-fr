@@ -1,0 +1,3 @@
+# Checks fr treats as the merge gate (tests: ci evidence, deliver).
+# GitHub Actions job names from .github/workflows/ci.yml.
+gate_checks: [go, govulncheck, image, helm]

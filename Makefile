@@ -5,7 +5,7 @@ build: frontend
 	go build -o bin/runs-fr ./cmd/runs-fr
 
 test:
-	go test ./... -race
+	go test ./... -race -cover
 
 lint:
 	go vet ./...

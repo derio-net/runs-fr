@@ -1,5 +1,9 @@
 # runs-fr
 
+<!-- fr:acceptance-badge -->
+[Acceptance report](https://derio-net.github.io/runs-fr/)
+<!-- /fr:acceptance-badge -->
+
 Kubernetes-native, **portable** web shell gateway for agentic runs. It lists
 live run pods (selected by an `fr.run/*` label) and lets you attach to a pod's
 named session in the browser, bridging the Kubernetes `pods/exec` subresource to

@@ -1,0 +1,56 @@
+schema_version: 2
+phase:
+  number: 2
+  title: Renovate for gomod, npm, Dockerfile and GitHub Actions (runs-fr#37)
+  tag: agentic
+  depends_on:
+  - 1
+  tracking_issue: null
+  acceptance:
+  - deps-gate-dependency-bot
+  tier: standard
+  files:
+  - renovate.json
+  - docs/acceptance/features/2026-11-15-runs-fr-deps-gate.yaml
+  estimate_lines: 70
+tasks:
+- number: 1
+  title: renovate.json, schema-validated (R8)
+  steps:
+  - id: P2.T1.S1
+    text: |-
+      RED: run `npx --yes --package renovate -- renovate-config-validator --strict renovate.json` with no renovate.json present; expected non-zero ("file not found"/no config). Capture the output.
+  - id: P2.T1.S2
+    text: |-
+      GREEN: write renovate.json exactly as the spec's §Renovate block (extends config:recommended; weekly "before 6am on monday" UTC; automerge false; dependency dashboard "Dependency Dashboard (runs-fr)"; postUpdateOptions gomodTidy; enabledManagers gomod/npm/dockerfile/github-actions/custom.regex; groups k8s.io, golang.org/x, xterm, github-actions, go toolchain matching go/golang/golangci/golangci-lint; rangeStrategy bump for gomod depType golang; three regex managers: e2e pip pins, govulncheck pin, golangci-lint version). Re-run the validator with --strict; exit 0.
+- number: 2
+  title: Prove extraction covers every manager (R8)
+  steps:
+  - id: P2.T2.S1
+    text: |-
+      Run `LOG_LEVEL=debug npx --yes --package renovate -- renovate --platform=local --dry-run=extract --print-config=false` from the repo root, capturing output to a git-ignored scratch file. Confirm the extracted package files include go.mod (gomod: go, toolchain, k8s.io/*, golang.org/x/*), web/package.json (npm: @xterm/*, esbuild), Dockerfile and test/e2e/Dockerfile (dockerfile: node, golang, distroless, python), .github/workflows/*.yml (github-actions), and the three regex managers (websockets and kubernetes from pypi, golang.org/x/vuln, golangci/golangci-lint). Any manager with zero deps is a config bug: fix renovate.json and re-run.
+  - id: P2.T2.S2
+    text: |-
+      Confirm from the same output that the `go toolchain` group would hold go (golang and toolchain depTypes), golang (docker) and golangci/golangci-lint, and that the `go` directive carries rangeStrategy bump. Record the per-manager dependency counts as a plan-journal discovery. Commit `chore(deps): add Renovate config (gomod, npm, Dockerfile, Actions)`.
+state:
+  steps:
+    P2.T1.S1:
+      state: x
+      ticked_at: '2026-11-15T08:21:52+00:00'
+      note: null
+    P2.T1.S2:
+      state: x
+      ticked_at: '2026-11-15T08:21:52+00:00'
+      note: null
+    P2.T2.S1:
+      state: x
+      ticked_at: '2026-11-15T08:21:52+00:00'
+      note: null
+    P2.T2.S2:
+      state: x
+      ticked_at: '2026-11-15T08:21:52+00:00'
+      note: null
+  completion:
+    at: '2026-11-15T08:21:52+00:00'
+    note: null
+    observed_prs: []

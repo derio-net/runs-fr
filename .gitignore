@@ -4,3 +4,5 @@ web/dist/
 cmd/runs-fr/static/bundle.*
 # Stray root lockfile — the frontend bundles with esbuild under web/, not the repo root.
 /package-lock.json
+docs/acceptance/report.html
+docs/acceptance/report.md

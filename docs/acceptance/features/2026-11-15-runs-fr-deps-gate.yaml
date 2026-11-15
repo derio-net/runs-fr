@@ -1,0 +1,75 @@
+# Acceptance rows owned by one feature (spec 2026-11-04-repo-feature-settings R16).
+# The effective matrix is a fold over every fragment in this directory
+# (`fr acceptance status`); it is never stored. Write rows with
+# `fr acceptance add` / `set-status`, never by hand. Keep `rows:` before
+# `amendments:`.
+schema_version: 1
+feature: 2026-11-15-runs-fr-deps-gate
+repo: derio-net/runs-fr
+rows:
+  - id: deps-gate-supported-toolchain
+    capability: Supported toolchain
+    acceptance: The gateway builds, vets, lints and passes its race-enabled test suite
+      on a supported Go release (1.27), with go.mod, the Docker build stage and CI all
+      using that one version.
+    origin:
+    - spec:2026-11-15-runs-fr-deps-gate#R1
+    - spec:2026-11-15-runs-fr-deps-gate#R2
+    - spec:2026-11-15-runs-fr-deps-gate#R7
+    levels:
+      unit:
+      - runs-fr:.github/workflows/ci.yml#go
+      - runs-fr:test/pins/pins_test.go#TestGoVersionPinsAgree
+      int:
+      - runs-fr:.github/workflows/ci.yml#image
+    status: ci
+    notes: go and image jobs green on the PR head; pin test guards drift
+    verify: none
+  - id: deps-gate-no-reachable-vulns
+    capability: Supported toolchain
+    acceptance: govulncheck reports no vulnerability reachable from the gateway's code,
+      stdlib and modules included.
+    origin:
+    - spec:2026-11-15-runs-fr-deps-gate#R3
+    - spec:2026-11-15-runs-fr-deps-gate#R4
+    levels:
+      int:
+      - runs-fr:.github/workflows/ci.yml#govulncheck
+      - runs-fr:.github/workflows/ci.yml#go
+    status: ci
+    notes: govulncheck job (pinned v1.9.0) and the go job's go mod tidy -diff step green
+      on the PR head
+    verify: none
+  - id: deps-gate-attach-works
+    capability: Supported toolchain
+    acceptance: After the bump, attaching to a pod through the deployed gateway still
+      opens an interactive shell that echoes input, honours resize and closes cleanly.
+    origin:
+    - spec:2026-11-15-runs-fr-deps-gate#R9
+    levels: {}
+    status: not-implemented
+    notes: ''
+    verify: live
+  - id: deps-gate-vuln-gate-blocks
+    capability: Vulnerability gate
+    acceptance: A pull request or push that leaves a reachable vulnerability fails CI,
+      and a weekly scheduled run on main surfaces newly published advisories without
+      anyone opening a PR.
+    origin:
+    - spec:2026-11-15-runs-fr-deps-gate#R5
+    - spec:2026-11-15-runs-fr-deps-gate#R6
+    levels: {}
+    status: not-implemented
+    notes: 'spec-review s-r1-2: the weekly schedule fires only from merged main, so
+      this row is proven post-merge (Test Plan 3)'
+    verify: live
+  - id: deps-gate-dependency-bot
+    capability: Dependency updates
+    acceptance: Renovate keeps gomod, npm (web/), Dockerfile and GitHub Actions dependencies
+      current by opening grouped update PRs that CI verifies, with nothing merged automatically.
+    origin:
+    - spec:2026-11-15-runs-fr-deps-gate#R8
+    levels: {}
+    status: not-implemented
+    notes: ''
+    verify: live

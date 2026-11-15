@@ -97,7 +97,10 @@ func TestAttachEchoesThroughPTY(t *testing.T) {
 	}
 	close(conn.closed)
 	select {
-	case <-done:
+	case err := <-done:
+		// A peer close may end attach with or without an error; the test only
+		// asserts that it returns.
+		t.Logf("attach returned after peer close: %v", err)
 	case <-time.After(4 * time.Second):
 		t.Fatal("attach did not return after peer close")
 	}
