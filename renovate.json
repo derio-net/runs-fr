@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Etc/UTC",
+  "automerge": false,
+  "dependencyDashboard": {"enabled": true, "title": "Dependency Dashboard (runs-fr)"},
+  "ignorePresets": [":ignoreModulesAndTests"],
+  "ignorePaths": ["**/node_modules/**", "**/bower_components/**", "**/vendor/**"],
+  "postUpdateOptions": ["gomodTidy"],
+  "enabledManagers": ["gomod", "npm", "dockerfile", "github-actions", "custom.regex"],
+  "packageRules": [
+    {"groupName": "k8s.io", "matchManagers": ["gomod"], "matchPackageNames": ["k8s.io/**"]},
+    {"groupName": "golang.org/x", "matchManagers": ["gomod"], "matchPackageNames": ["golang.org/x/**"]},
+    {"groupName": "xterm", "matchManagers": ["npm"], "matchPackageNames": ["@xterm/**"]},
+    {"groupName": "github-actions", "matchManagers": ["github-actions"]},
+    {"groupName": "go toolchain", "matchPackageNames": ["go", "golang", "golangci/golangci-lint"]},
+    {"matchManagers": ["gomod"], "matchDepTypes": ["golang"], "rangeStrategy": "bump"}
+  ],
+  "customManagers": [
+    {"customType": "regex", "managerFilePatterns": ["/^test/e2e/Dockerfile$/"],
+     "matchStrings": ["\"(?<depName>[a-zA-Z0-9_.-]+)==(?<currentValue>[^\"]+)\""],
+     "datasourceTemplate": "pypi"},
+    {"customType": "regex", "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+     "matchStrings": ["golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v[0-9.]+)"],
+     "depNameTemplate": "golang.org/x/vuln", "datasourceTemplate": "go"},
+    {"customType": "regex", "managerFilePatterns": ["/^\\.github/workflows/ci\\.ya?ml$/"],
+     "matchStrings": ["golangci-lint-action@\\S+\\s+with:\\s+version:\\s*(?<currentValue>v[0-9.]+)"],
+     "depNameTemplate": "golangci/golangci-lint", "datasourceTemplate": "github-releases"}
+  ]
+}
