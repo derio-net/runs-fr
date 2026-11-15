@@ -16,9 +16,14 @@ rows:
     - spec:2026-11-15-runs-fr-deps-gate#R1
     - spec:2026-11-15-runs-fr-deps-gate#R2
     - spec:2026-11-15-runs-fr-deps-gate#R7
-    levels: {}
-    status: not-implemented
-    notes: ''
+    levels:
+      unit:
+      - runs-fr:.github/workflows/ci.yml#go
+      - runs-fr:test/pins/pins_test.go#TestGoVersionPinsAgree
+      int:
+      - runs-fr:.github/workflows/ci.yml#image
+    status: ci
+    notes: go and image jobs green on the PR head; pin test guards drift
     verify: none
   - id: deps-gate-no-reachable-vulns
     capability: Supported toolchain
