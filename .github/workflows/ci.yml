@@ -57,14 +57,24 @@ jobs:
     # Same authority gate as go/helm (Actions has no cross-job YAML anchors).
     if: (vars.CI_AUTHORITY || 'github') == (github.server_url == 'https://github.com' && 'github' || 'gitea')
     runs-on: ubuntu-latest
-    # issues: write is scoped to this job alone, for the scheduled-failure
-    # issue below; the workflow default stays contents: read.
+    # Read-only: this runs on every PR and push. Filing an issue is the
+    # schedule-only govulncheck-issue job's, which alone holds issues: write.
     permissions:
       contents: read
-      issues: write
+    outputs:
+      # govulncheck's own exit code: 3 = reachable vulnerability found,
+      # anything else non-zero = the scan itself failed. Empty when an
+      # earlier step failed before the scan ran.
+      exit: ${{ steps.scan.outputs.exit }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
+      # setup-go@v5 installs the go directive's version (1.27.0); go then
+      # fetches go.mod's toolchain (go1.27.4) itself (GOTOOLCHAIN=auto), so the
+      # scan runs on the toolchain line. setup-go v6 reads `toolchain` directly
+      # — left to Renovate's first github-actions PR (spec R10).
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -74,27 +84,50 @@ jobs:
       # static/index.html and static/xterm.css satisfy the glob without the
       # built bundle.js. govulncheck exits non-zero on any reachable
       # (symbol-level) vulnerability, so the default mode is the hard gate.
-      - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      # Installed, not `go run`: go run reports every child failure as exit 1,
+      # which would hide exit 3 (vulnerabilities found).
+      - name: install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
-      # A red PR/push run already shows on the PR or commit; this is for the
-      # weekly run nobody is watching. GitHub only (the Gitea mirror has no
-      # issues to file into).
-      - name: open or comment the vulnerability issue
-        if: failure() && github.event_name == 'schedule' && github.server_url == 'https://github.com'
+      - name: govulncheck
+        id: scan
+        run: |
+          set +e
+          "$(go env GOPATH)/bin/govulncheck" ./...
+          rc=$?
+          echo "exit=$rc" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+
+  govulncheck-issue:
+    # A red PR/push run already shows on the PR or commit; this is for the
+    # weekly run nobody is watching. GitHub only (the Gitea mirror has no
+    # issues to file into), and the only job that may write issues.
+    needs: govulncheck
+    if: failure() && github.event_name == 'schedule' && github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: open or comment the issue
         env:
           GH_TOKEN: ${{ github.token }}
-          TITLE: "govulncheck: reachable vulnerability on main"
+          SCAN_EXIT: ${{ needs.govulncheck.outputs.exit }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number,title \
-            | jq -r --arg t "$TITLE" '[.[] | select(.title == $t)][0].number // empty')
-          body="The scheduled govulncheck run on main failed: $RUN_URL"
+          if [ "$SCAN_EXIT" = "3" ]; then
+            title="govulncheck: reachable vulnerability on main"
+            body="The scheduled govulncheck run found a reachable vulnerability on main: $RUN_URL"
+          else
+            title="govulncheck: scheduled scan failed on main"
+            body="The scheduled govulncheck job failed before reporting a result (scan exit: ${SCAN_EXIT:-none}): $RUN_URL"
+          fi
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --search "\"$title\" in:title" --json number,title \
+            | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
           if [ -n "$n" ]; then
             gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$body"
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           fi
 
   image:

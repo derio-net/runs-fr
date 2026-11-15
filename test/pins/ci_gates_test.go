@@ -71,6 +71,8 @@ var (
 	reGovulncheckPinned = regexp.MustCompile(`golang\.org/x/vuln/cmd/govulncheck@v\d+\.\d+\.\d+\b`)
 	reGoTestRun         = regexp.MustCompile(`run:\s*go test\b.*`)
 	reIfLine            = regexp.MustCompile(`(?m)^\s{4}if:\s*(.+)$`)
+	// A permissions key line, never a comment that mentions one.
+	reIssuesWrite = regexp.MustCompile(`(?m)^\s+issues:\s*write\s*$`)
 )
 
 func TestCIGates(t *testing.T) {
@@ -105,6 +107,48 @@ func TestCIGates(t *testing.T) {
 		}
 		if strings.Contains(txt, "continue-on-error") {
 			t.Errorf("%s:%d: govulncheck job sets continue-on-error; it must fail the workflow", ciPath, b.line)
+		}
+		// `go run` reports any non-zero child exit as 1, hiding govulncheck's
+		// exit 3 (vulnerabilities found) behind its exit 1 (tool error).
+		if strings.Contains(txt, "go run golang.org/x/vuln/cmd/govulncheck") {
+			t.Errorf("%s:%d: govulncheck job uses `go run`, which masks govulncheck's exit code; install it and run the binary", ciPath, b.line)
+		}
+		if !strings.Contains(txt, "exit=") || !strings.Contains(txt, "GITHUB_OUTPUT") {
+			t.Errorf("%s:%d: govulncheck job does not publish the scan's exit code as an output", ciPath, b.line)
+		}
+		// Least privilege: the scan runs on every PR and push; only the
+		// schedule-only issue job may write issues.
+		if reIssuesWrite.MatchString(txt) {
+			t.Errorf("%s:%d: govulncheck job holds issues: write; move issue filing to its own schedule-only job", ciPath, b.line)
+		}
+		if !strings.Contains(txt, "persist-credentials: false") {
+			t.Errorf("%s:%d: govulncheck job's checkout persists the token; set persist-credentials: false", ciPath, b.line)
+		}
+	})
+
+	t.Run("scheduled scan failures file an issue from a schedule-only job", func(t *testing.T) {
+		b := job(t, "govulncheck-issue")
+		txt := b.text()
+		for _, want := range []string{
+			"needs: govulncheck",
+			"failure()",
+			"github.event_name == 'schedule'",
+			"github.server_url == 'https://github.com'",
+			"needs.govulncheck.outputs.exit",
+		} {
+			if !strings.Contains(txt, want) {
+				t.Errorf("%s:%d: govulncheck-issue job lacks %q", ciPath, b.line, want)
+			}
+		}
+		if !reIssuesWrite.MatchString(txt) {
+			t.Errorf("%s:%d: govulncheck-issue job has no `issues: write` permission", ciPath, b.line)
+		}
+		// Exit 3 is "vulnerabilities found"; anything else is the job failing.
+		if !strings.Contains(txt, "reachable vulnerability on main") || !strings.Contains(txt, "scan failed on main") {
+			t.Errorf("%s:%d: govulncheck-issue job does not title a vulnerability apart from a failed scan", ciPath, b.line)
+		}
+		if strings.Contains(txt, "contents: write") {
+			t.Errorf("%s:%d: govulncheck-issue job needs no contents: write", ciPath, b.line)
 		}
 	})
 
