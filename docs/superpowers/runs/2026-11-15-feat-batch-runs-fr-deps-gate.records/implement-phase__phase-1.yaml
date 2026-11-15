@@ -1,0 +1,103 @@
+# Step record. Fill it as you work and commit it with your work; then
+#   fr run resolve 2026-11-15-feat-batch-runs-fr-deps-gate --step implement-phase --item phase/1 --record docs/superpowers/runs/2026-11-15-feat-batch-runs-fr-deps-gate.records/implement-phase__phase-1.yaml
+# applies all of it in one commit (spec 2026-09-25 §5.C).
+schema_version: 12
+run: 2026-11-15-feat-batch-runs-fr-deps-gate
+step: implement-phase
+item: phase/1
+outcome: done
+ticks: [P1.T1.S1, P1.T1.S2, P1.T2.S1, P1.T2.S2, P1.T2.S3, P1.T3.S1, P1.T3.S2, P1.T3.S3, P1.T3.S4, P1.T3.S5, P1.T4.S1, P1.T4.S2, P1.T5.S1, P1.T5.S2, P1.T6.S1, P1.T6.S2, P1.T6.S3, P1.T6.S4, P1.T7.S1, P1.T7.S2]
+refactor:
+  P1.T1: "Measurement only (baseline suite and a captured govulncheck run); no code was written."
+  P1.T3: "Version-only rungs (go.mod/go.sum); the existing suite is the guard. No rung broke an API in internal/term, so there was no adapted code to clean. The behavioural break found across the ladder was fixed and tested in its own commit (851b2fa)."
+  P1.T4: "go get/go mod tidy of indirect modules only; no code changed."
+  P1.T5: "Two one-line lint fixes in tests plus the CI version pin; nothing left to restructure."
+  P1.T7: "Push, CI read and acceptance-row moves via fr; no code written."
+journal:
+  - kind: discovery
+    id: p1-govulncheck-prebump
+    phase: 1
+    title: "govulncheck pin v1.9.0; the pre-bump tree exits 3 with 50 reachable vulnerabilities"
+    body: |
+      Pin: golang.org/x/vuln v1.9.0 (newest non-prerelease). It requires go >= 1.26, so the
+      plan's literal `GOTOOLCHAIN=go1.23.4 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...`
+      refuses to build. Instead the v1.9.0 binary was built with Go 1.27.4
+      (`GOBIN=$PWD/bin go install …@v1.9.0`) and run as `GOTOOLCHAIN=go1.23.4 ./bin/govulncheck ./...`,
+      so it loaded the packages with the go1.23.4 toolchain and stdlib (findings read
+      "Found in: net/http@go1.23.4").
+
+      Result on the unmodified tree: exit 3, "Your code is affected by 50 vulnerabilities from
+      3 modules and the Go standard library." Modules named: golang.org/x/net (v0.30.0),
+      github.com/moby/spdystream (v0.5.0), golang.org/x/text, github.com/gorilla/websocket;
+      the bulk is stdlib (net/http, crypto/x509, crypto/tls). This is the evidence that the
+      gate fails on a reachable vulnerability (row deps-gate-vuln-gate-blocks, PR/push half).
+
+      After the toolchain and k8s ladder: 5 vulnerabilities, all golang.org/x/net v0.57.0
+      (fixed in v0.60.0). After `go get golang.org/x/net@latest` (v0.62.0, pulling x/sys
+      v0.49.0, x/term v0.47.0, x/text v0.43.0): "No vulnerabilities found.", exit 0.
+      spdystream was already moved to v0.5.1 (its latest) by the ladder.
+
+      Note for CI: through `go run`, a govulncheck exit 3 surfaces as exit 1 (go run maps a
+      non-zero child exit to 1); the job still fails, which is all the gate needs.
+  - kind: discovery
+    id: p1-k8s-ladder-spdy-fallback
+    phase: 1
+    title: "k8s ladder v0.32.13 → v0.33.13 → v0.34.13 → v0.35.10 → v0.36.6 → v0.37.2: no API break, but the SPDY fallback silently stopped firing from v0.36"
+    body: |
+      Every rung was green on go vet and go test -race with no code change in internal/term.
+      golangci-lint v2.15.0 then flagged (SA1019) that k8s.io/apimachinery/pkg/util/httpstream
+      is deprecated in favour of k8s.io/streaming/pkg/httpstream. Tracing it showed a real
+      behavioural regression: since client-go v0.36 the WebSocket round-tripper returns
+      k8s.io/streaming's UpgradeFailureError, a distinct struct from apimachinery's copy, so
+      `httpstream.IsUpgradeFailure` (apimachinery) passed to `remotecommand.NewFallbackExecutor`
+      never matched and a refused WebSocket upgrade no longer fell back to SPDY. The suite
+      did not catch it because nothing exercised the fallback.
+
+      Fix (commit 851b2fa, separate from the rung commits because no rung broke the build or a
+      test): internal/term/exec.go now uses k8s.io/streaming/pkg/httpstream.IsUpgradeFailure
+      (k8s.io/streaming v0.37.2 becomes a direct requirement), still via
+      `remotecommand.NewFallbackExecutor(ws, spdy, httpstream.IsUpgradeFailure)`. New test
+      internal/term/fallback_test.go drives the real client-go transports against an httptest
+      server that refuses every upgrade and asserts a POST (SPDY) follows the GET (WebSocket);
+      it failed with methods=[GET] before the fix and passes after. This matters to the live
+      row deps-gate-attach-works: an older API server or an Upgrade-stripping proxy would have
+      broken attach after merge.
+  - kind: discovery
+    id: p1-golangci-lint-pin
+    phase: 1
+    title: "golangci-lint pinned to v2.15.0 (Go 1.27 support since v2.13.0)"
+    body: |
+      The changelog lists "go1.27 support" under v2.13.0; v2.15.0 is the newest v2.x release
+      and was picked. Locally (`go run …/golangci-lint@v2.15.0 run`) it reported 3 findings,
+      all fixed in code, no linter disabled: an unchecked receive in
+      internal/localterm/attacher_test.go, an unchecked Close in test/pins/pins_test.go, and
+      the SA1019 httpstream deprecation (see p1-k8s-ladder-spdy-fallback). 0 issues after.
+  - kind: discovery
+    id: p1-ci-authority-if-repeated
+    phase: 1
+    title: "Authority if: stays repeated per job in ci.yml"
+    body: |
+      P1.T6.S4: GitHub Actions has accepted YAML anchors since 2025, but this workflow also
+      runs on the Gitea Actions mirror, whose support for anchors is not established, and
+      deduping would change nothing at runtime. The expression is repeated verbatim on go,
+      govulncheck, image and helm, and TestCIGates asserts the new jobs and helm carry the go
+      job's exact `if:`. ci.yml comments explain why govulncheck needs no Node step and why
+      issues: write is job-scoped.
+  - kind: discovery
+    id: p1-acceptance-ref-grammar
+    phase: 1
+    title: "Acceptance levels: keys are unit/api/int/ui and refs are '<repo>:<path>', so the plan's T7.S2 command needed adapting"
+    body: |
+      `fr acceptance set-status` refuses the plan's `--level ci=derio-net/runs-fr:…`: the level
+      keys are unit | api | int | ui (no `ci`), and the ref's repo part may not contain "/"
+      (it is `runs-fr:<path>`). Rows moved to `ci` with: deps-gate-supported-toolchain —
+      unit=runs-fr:.github/workflows/ci.yml#go, unit=runs-fr:test/pins/pins_test.go#TestGoVersionPinsAgree,
+      int=runs-fr:.github/workflows/ci.yml#image; deps-gate-no-reachable-vulns —
+      int=runs-fr:.github/workflows/ci.yml#govulncheck, int=runs-fr:.github/workflows/ci.yml#go
+      (the tidy step). set-status also refuses `--level` without `--status`, so
+      deps-gate-vuln-gate-blocks and deps-gate-attach-works were left untouched at
+      not-implemented / verify: live; their candidate unit levels are
+      runs-fr:test/pins/ci_gates_test.go#TestCIGates and
+      runs-fr:internal/term/fallback_test.go#TestNewExecutorFallsBackToSPDYOnUpgradeFailure.
+resolves: []
+evidence: {tests: ci}
