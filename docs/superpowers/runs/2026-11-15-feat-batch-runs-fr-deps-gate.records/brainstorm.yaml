@@ -1,0 +1,96 @@
+schema_version: 12
+run: 2026-11-15-feat-batch-runs-fr-deps-gate
+step: brainstorm
+outcome: done
+questions: {rounds: 1}
+journal:
+  - kind: discovery
+    input: true
+    id: operator-brief
+    title: Operator brief (verbatim) — batch runs-fr-deps-gate
+    body: |
+      /fr-goal runs-fr: supported Go toolchain, govulncheck in CI, dependency bot
+
+      Batch `runs-fr-deps-gate` of derio-net/runs-fr: 3 issues, delivered as ONE pull request.
+
+      ## runs-fr#31: [High] Bump EOL Go toolchain + stale deps to clear 31 reachable govulncheck vulns
+      Still EOL: `go.mod` `go 1.23.0 / toolchain go1.23.4`, `Dockerfile:25` `golang:1.23-alpine`, `ci.yml:19` go-version 1.23. Reachable stdlib/x-net vulns on a shell gateway.
+      Note: Batch with runs-fr#32, #37 (deps + gates).
+
+      ## runs-fr#32: [High] Add govulncheck to CI (report-only, then hard gate)
+      No `govulncheck` anywhere in `.github/` on main.
+
+      ## runs-fr#37: [Medium] Add Renovate/Dependabot (gomod, npm, Dockerfile, Actions)
+      No renovate.json or dependabot config tracked on main.
+
+      ## Why these belong together
+      The shell gateway is on an end-of-life Go with reachable vulnerabilities and has no vulnerability check or dependency updates; one go.mod and one ci.yml.
+
+      ## Delivery rules
+      - Work on branch `feat/batch-runs-fr-deps-gate`.
+      - Open a draft PR as soon as the spec is committed. Its body contains these lines, one per member, so every member closes when it merges:
+        Closes derio-net/runs-fr#31
+        Closes derio-net/runs-fr#32
+        Closes derio-net/runs-fr#37
+      - Do not name any member issue as a phase `tracking_issue` in the plan: the bridge would then own that issue's `fr:` labels.
+
+      Never add the `approved-fr` label: it is the operator's approval to merge, and fr voids it on your next push.
+  - kind: decision
+    id: go-target
+    title: Go 1.27 everywhere; CI reads the version from go.mod
+    body: "Operator chose (recommended): go.mod `go 1.27.0` + `toolchain go1.27.4`, Dockerfile `golang:1.27-alpine`, ci.yml `go-version-file: go.mod`. Rejected: 1.26 floor with 1.27 toolchain; 1.26 everywhere. (R1)"
+  - kind: decision
+    id: k8s-ladder
+    title: Ladder k8s.io/* one minor per commit to latest v0.37.x
+    body: "Operator chose (recommended): 0.32→0.33→…→0.37, vet + test -race green per rung, one commit per rung. Rejected: jump straight to 0.37; stop at 0.36. (R2)"
+  - kind: decision
+    id: vuln-gate-mode
+    title: govulncheck ships as a hard gate plus a weekly scheduled scan
+    body: "Operator chose (recommended): fail CI on any reachable vuln from day one, plus a weekly schedule on main. Rejected: hard gate on PR/push only; report-only now with a follow-up flip. #32's report-only step is moot because the bump lands in the same PR. (R5)"
+  - kind: decision
+    id: dep-bot
+    title: Renovate, grouped, automerge off
+    body: "Operator chose (recommended): renovate.json, weekly, dependency dashboard, gomodTidy, groups for k8s.io, golang.org/x, xterm, Actions, Go toolchain; automerge off, matching frank. Rejected: Dependabot; Renovate + Dependabot security updates. App enablement for the repo, if repo-selected, is an operator step. (R8)"
+  - kind: decision
+    id: bump-scope
+    title: Bump Go + only what Go forces (golangci-lint); the rest to Renovate
+    body: "Operator chose (recommended): Go toolchain, Go modules and golangci-lint by hand; Node, action majors, esbuild, xterm, e2e pip pins left for Renovate's first PRs. Rejected: everything stale now; Go + Actions alignment. (R7, R10)"
+  - kind: decision
+    id: verification-gate
+    title: Attach row is live; run gate tester
+    body: "Operator chose (recommended): PR CI verifies the build, vuln and gate rows pre-merge; a post-merge Test Plan covers the staging-gate e2e, an operator attach check and Renovate's first activity; `gate: tester` holds the close-out until the walk is recorded. Rejected: gate developer; CI only with no live row. No `.fr/candidate-install` exists, so `candidate` was not offered."
+resolves: []
+acceptance:
+  - id: deps-gate-supported-toolchain
+    capability: Supported toolchain
+    acceptance: The gateway builds, vets, lints and passes its race-enabled test suite on a supported Go release (1.27), with go.mod, the Docker build stage and CI all using that one version.
+    origin: ["spec:2026-11-15-runs-fr-deps-gate#R1", "spec:2026-11-15-runs-fr-deps-gate#R2", "spec:2026-11-15-runs-fr-deps-gate#R7"]
+    status: not-implemented
+    verify: none
+  - id: deps-gate-no-reachable-vulns
+    capability: Supported toolchain
+    acceptance: govulncheck reports no vulnerability reachable from the gateway's code, stdlib and modules included.
+    origin: ["spec:2026-11-15-runs-fr-deps-gate#R3", "spec:2026-11-15-runs-fr-deps-gate#R4"]
+    status: not-implemented
+    verify: none
+  - id: deps-gate-vuln-gate-blocks
+    capability: Vulnerability gate
+    acceptance: A pull request or push that leaves a reachable vulnerability fails CI, and a weekly scheduled run on main surfaces newly published advisories without anyone opening a PR.
+    origin: ["spec:2026-11-15-runs-fr-deps-gate#R5", "spec:2026-11-15-runs-fr-deps-gate#R6"]
+    status: not-implemented
+    verify: none
+  - id: deps-gate-dependency-bot
+    capability: Dependency updates
+    acceptance: Renovate keeps gomod, npm (web/), Dockerfile and GitHub Actions dependencies current by opening grouped update PRs that CI verifies, with nothing merged automatically.
+    origin: ["spec:2026-11-15-runs-fr-deps-gate#R8"]
+    status: not-implemented
+    verify: live
+  - id: deps-gate-attach-works
+    capability: Supported toolchain
+    acceptance: After the bump, attaching to a pod through the deployed gateway still opens an interactive shell that echoes input, honours resize and closes cleanly.
+    origin: ["spec:2026-11-15-runs-fr-deps-gate#R9"]
+    status: not-implemented
+    verify: live
+emitted:
+  spec: docs/superpowers/specs/2026-11-15-runs-fr-deps-gate-design.md
+evidence: {}
