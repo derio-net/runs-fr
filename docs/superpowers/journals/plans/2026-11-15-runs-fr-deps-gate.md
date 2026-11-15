@@ -430,3 +430,8 @@ bc0d893: the regex allows an optional `[ \t]+#…` tail after the action ref; Te
 ### p2-r5-resolved-2 · finding [deferred → https://github.com/derio-net/runs-fr/issues/47] · resolves p2-r5: test/e2e/__pycache__/smoke.cpython-314.pyc is tracked in git (phase 2)
 
 Filed at deliver as https://github.com/derio-net/runs-fr/issues/47.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r1-resolved-2 created=2026-11-15T08:40:23+00:00 state=open resolves=l-security-r1 tracked_by=https://github.com/derio-net/runs-fr/issues/48 -->
+### l-security-r1-resolved-2 · finding [deferred → https://github.com/derio-net/runs-fr/issues/48] · resolves l-security-r1: acceptance-report.yml installs fr from mutable @main and runs it in the write-scoped debt and pages jobs
+
+Filed at deliver as https://github.com/derio-net/runs-fr/issues/48.
