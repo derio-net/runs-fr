@@ -53,14 +53,8 @@ func readLines(t *testing.T, path string) []string {
 	return lines
 }
 
-// findFirst returns the first line of the file matching re, with its first
-// submatch as ver.
-func findFirst(t *testing.T, path string, re *regexp.Regexp) (pin, bool) {
-	t.Helper()
-	return findFirstIn(path, readLines(t, path), re)
-}
-
-// findFirstIn is findFirst over lines already read (path only labels the pin).
+// findFirstIn returns the first of lines matching re, with its first submatch
+// as ver (path only labels the pin).
 func findFirstIn(path string, lines []string, re *regexp.Regexp) (pin, bool) {
 	for i, l := range lines {
 		if m := re.FindStringSubmatch(l); m != nil {
