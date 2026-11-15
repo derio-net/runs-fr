@@ -1,0 +1,10 @@
+schema_version: 12
+run: 2026-11-15-feat-batch-runs-fr-deps-gate
+step: plan
+outcome: done
+journal:
+  - {kind: lens, lens: security, title: "Shell gateway on a new Go/client-go, plus a CI job granted issues: write and a scheduled trigger — review the whole diff for privilege and supply-chain exposure"}
+resolves: []
+emitted:
+  plan: docs/superpowers/plans/2026-11-15-runs-fr-deps-gate
+evidence: {}
