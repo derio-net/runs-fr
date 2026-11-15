@@ -207,3 +207,37 @@ Verified by reverting the line and running golangci-lint v2.15.0: `internal/loca
 ### p1-o1-resolved · finding [fixed] · resolves p1-o1: Scaffolded acceptance-report matrix job lacks the CI-authority if:, so it also runs (and fails) on the Gitea mirror (phase 1)
 
 b2f6b34 adds the CI-authority if: to the acceptance-report matrix job (pages, which needs it, skips with it on Gitea).
+
+<!-- fr:journal kind=discovery scope=plan id=renovate-extract-counts created=2026-11-15T08:21:52+00:00 phase=2 -->
+### renovate-extract-counts · discovery · Local extraction deps per manager (renovate 44.239.1, config via RENOVATE_CONFIG_FILE) (phase 2)
+
+dockerfile 2 files / 5 deps (Dockerfile 4: docker/dockerfile, node, golang, distroless; test/e2e/Dockerfile 1: python);
+github-actions 5 files / 58 deps; gomod 1 file / 54 deps (go [golang depType 1.27.0], go [toolchain 1.27.4], k8s.io/*, golang.org/x/*);
+npm 1 file / 3 deps (@xterm/addon-fit, @xterm/xterm, esbuild);
+regex 3 matches / 4 deps: test/e2e/Dockerfile websockets 12.0 + kubernetes 31.0.0 (pypi), ci.yml golang.org/x/vuln v1.9.0 (go), ci.yml golangci/golangci-lint v2.15.0 (github-releases).
+The go toolchain group's members (go golang+toolchain depTypes, golang docker stage, golangci/golangci-lint) all extract under the names the rule matches; extract mode does not apply packageRules, so group/rangeStrategy membership is shown by config plus extracted depNames/depTypes, not by a rendered update.
+
+<!-- fr:journal kind=discovery scope=plan id=renovate-local-ignores-repo-config created=2026-11-15T08:21:52+00:00 phase=2 -->
+### renovate-local-ignores-repo-config · discovery · --platform=local does not read renovate.json; extraction needs RENOVATE_CONFIG_FILE=renovate.json (phase 2)
+
+Without it the dry run applies no enabledManagers or customManagers (no regex deps, extra devcontainer/helm-values managers). The plan's command is therefore run as `RENOVATE_CONFIG_FILE=renovate.json renovate --platform=local --dry-run=extract`.
+
+<!-- fr:journal kind=discovery scope=plan id=renovate-spec-deviation-dashboard created=2026-11-15T08:21:52+00:00 phase=2 -->
+### renovate-spec-deviation-dashboard · discovery · Deviation: dependencyDashboard {enabled,title} object instead of dependencyDashboard + dependencyDashboardTitle (phase 2)
+
+--strict validator reported 'Config migration necessary' (exit 1) for dependencyDashboardTitle; migrated form adopted, same behaviour.
+
+<!-- fr:journal kind=discovery scope=plan id=renovate-spec-deviation-ignorepaths created=2026-11-15T08:21:52+00:00 phase=2 -->
+### renovate-spec-deviation-ignorepaths · discovery · Deviation: ignorePresets [:ignoreModulesAndTests] and ignorePaths for node_modules/bower_components/vendor (phase 2)
+
+config:recommended ignores **/test/**, which hid test/e2e/Dockerfile (e2e regex manager and dockerfile python dep extracted zero). Overriding ignorePaths alone does not work (preset arrays merge); ignorePresets drops the test globs, ignorePaths keeps the vendor ones.
+
+<!-- fr:journal kind=discovery scope=plan id=no-refactor-p2-t1 created=2026-11-15T08:21:52+00:00 phase=2 -->
+### no-refactor-p2-t1 · discovery · no-refactor-because P2.T1 (phase 2)
+
+a single new JSON config file; nothing existing to clean
+
+<!-- fr:journal kind=discovery scope=plan id=no-refactor-p2-t2 created=2026-11-15T08:21:52+00:00 phase=2 -->
+### no-refactor-p2-t2 · discovery · no-refactor-because P2.T2 (phase 2)
+
+verification-only task; no code written
