@@ -174,3 +174,6 @@ run_kind: none
 
 <!-- fr:journal kind=decision scope=spec id=phase-split-2026-11-15-runs-fr-deps-gate-p3 created=2026-11-15T07:11:43+00:00 -->
 ### phase-split-2026-11-15-runs-fr-deps-gate-p3 · decision · ask: enabling the Renovate app is operator-only GitHub UI work, collected into a back-loaded [manual] phase
+
+<!-- fr:journal kind=decision scope=spec id=tier-2026-11-15-runs-fr-deps-gate-p1 created=2026-11-15T07:11:45+00:00 -->
+### tier-2026-11-15-runs-fr-deps-gate-p1 · decision · hard: phase 1 adds a CI gate every future PR relies on and ladders client-go across five minors under the exec/remotecommand path, where API drift needs judgement
