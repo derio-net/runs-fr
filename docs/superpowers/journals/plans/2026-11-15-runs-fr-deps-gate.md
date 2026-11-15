@@ -425,3 +425,8 @@ bc0d893: the regex allows an optional `[ \t]+#…` tail after the action ref; Te
 ### l-tests-r6-resolved · finding [fixed] · resolves l-tests-r6: trigger test accepted an empty `schedule:` key
 
 13ef927: reCron requires a `- cron: "…"` entry under schedule; mutation 'schedule left with no cron' must fail.
+
+<!-- fr:journal kind=finding scope=plan id=p2-r5-resolved-2 created=2026-11-15T08:40:16+00:00 phase=2 state=open resolves=p2-r5 tracked_by=https://github.com/derio-net/runs-fr/issues/47 -->
+### p2-r5-resolved-2 · finding [deferred → https://github.com/derio-net/runs-fr/issues/47] · resolves p2-r5: test/e2e/__pycache__/smoke.cpython-314.pyc is tracked in git (phase 2)
+
+Filed at deliver as https://github.com/derio-net/runs-fr/issues/47.
