@@ -435,3 +435,8 @@ Filed at deliver as https://github.com/derio-net/runs-fr/issues/47.
 ### l-security-r1-resolved-2 · finding [deferred → https://github.com/derio-net/runs-fr/issues/48] · resolves l-security-r1: acceptance-report.yml installs fr from mutable @main and runs it in the write-scoped debt and pages jobs
 
 Filed at deliver as https://github.com/derio-net/runs-fr/issues/48.
+
+<!-- fr:journal kind=finding scope=plan id=l-security-r2-resolved-2 created=2026-11-15T08:40:30+00:00 state=open resolves=l-security-r2 tracked_by=https://github.com/derio-net/runs-fr/issues/49 -->
+### l-security-r2-resolved-2 · finding [deferred → https://github.com/derio-net/runs-fr/issues/49] · resolves l-security-r2: debt job checkout persists the FR_DEBT_TOKEN PAT in .git/config
+
+Filed at deliver as https://github.com/derio-net/runs-fr/issues/49.
