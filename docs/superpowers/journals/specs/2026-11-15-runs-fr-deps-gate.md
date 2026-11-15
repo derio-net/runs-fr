@@ -171,3 +171,6 @@ run_kind: none
 
 <!-- fr:journal kind=decision scope=spec id=phase-split-2026-11-15-runs-fr-deps-gate-p2 created=2026-11-15T07:11:41+00:00 -->
 ### phase-split-2026-11-15-runs-fr-deps-gate-p2 · decision · ask: runs-fr#37 — Renovate config is its own independently reviewable ask, and its regexes must match phase 1's final ci.yml
+
+<!-- fr:journal kind=decision scope=spec id=phase-split-2026-11-15-runs-fr-deps-gate-p3 created=2026-11-15T07:11:43+00:00 -->
+### phase-split-2026-11-15-runs-fr-deps-gate-p3 · decision · ask: enabling the Renovate app is operator-only GitHub UI work, collected into a back-loaded [manual] phase
