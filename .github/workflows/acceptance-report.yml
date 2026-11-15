@@ -65,7 +65,11 @@ jobs:
   # fails this job loudly (it was scaffolded only where Pages were allowed, so visibility
   # changed) and cannot unpublish a live site: delete it by hand.
   pages:
+    # GitHub only: Pages is a GitHub feature, and the authority gate keeps this
+    # write-scoped job off the Gitea mirror (as on every runs-fr job).
     if: >-
+      github.server_url == 'https://github.com' &&
+      (vars.CI_AUTHORITY || 'github') == 'github' &&
       github.event_name == 'push' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     needs: matrix
@@ -123,7 +127,11 @@ jobs:
   # job above (which runs this repo's code on every PR) holds neither. It does not
   # `needs:` the matrix, so a week with failing rows still updates the issue.
   debt:
-    if: github.event_name == 'schedule' || inputs.debt
+    # Authority gate first: this job holds write scopes and FR_DEBT_TOKEN, so it
+    # must not also run on the Gitea mirror.
+    if: >-
+      (vars.CI_AUTHORITY || 'github') == (github.server_url == 'https://github.com' && 'github' || 'gitea') &&
+      (github.event_name == 'schedule' || inputs.debt)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
