@@ -51,8 +51,9 @@ rows:
     - spec:2026-11-15-runs-fr-deps-gate#R6
     levels: {}
     status: not-implemented
-    notes: ''
-    verify: none
+    notes: 'spec-review s-r1-2: the weekly schedule fires only from merged main, so
+      this row is proven post-merge (Test Plan 3)'
+    verify: live
   - id: deps-gate-dependency-bot
     capability: Dependency updates
     acceptance: Renovate keeps gomod, npm (web/), Dockerfile and GitHub Actions dependencies
