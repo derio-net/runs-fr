@@ -14,8 +14,10 @@
     {"groupName": "golang.org/x", "matchManagers": ["gomod"], "matchPackageNames": ["golang.org/x/**"]},
     {"groupName": "xterm", "matchManagers": ["npm"], "matchPackageNames": ["@xterm/**"]},
     {"groupName": "github-actions", "matchManagers": ["github-actions"]},
-    {"groupName": "go toolchain", "matchPackageNames": ["go", "golang", "golangci/golangci-lint"]},
-    {"matchManagers": ["gomod"], "matchDepTypes": ["golang"], "rangeStrategy": "bump"}
+    {"groupName": "node", "matchDepNames": ["node"]},
+    {"groupName": "go toolchain", "matchPackageNames": ["go", "golang", "golangci/golangci-lint"], "minimumReleaseAge": "7 days"},
+    {"matchManagers": ["gomod"], "matchDepTypes": ["golang"], "rangeStrategy": "bump", "allowedVersions": "/^\\d+\\.\\d+\\.0$/"},
+    {"matchManagers": ["github-actions"], "matchDepTypes": ["uses-with"], "matchPackageNames": ["golangci/golangci-lint"], "enabled": false}
   ],
   "customManagers": [
     {"customType": "regex", "managerFilePatterns": ["/^test/e2e/Dockerfile$/"],
