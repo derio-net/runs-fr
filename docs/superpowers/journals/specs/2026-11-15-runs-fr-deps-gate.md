@@ -200,3 +200,11 @@ what: Attach to a pod through the deployed gateway: an interactive shell opens, 
 why: Needs an interactive browser session through the deployed gateway (shell opens, input echoes, resize, clean exit) — operator-driven by the Test Plan; not exercisable from this agent session.
 how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-2 --state fixed --note "<evidence>"
 owed_key: spec:2026-11-15-runs-fr-deps-gate#step2
+
+<!-- fr:journal kind=owed scope=spec id=test-plan-step-4 created=2026-11-22T21:40:06+00:00 -->
+### test-plan-step-4 · owed · Test Plan step 4 owed
+
+what: Within a week of merge: the "Dependency Dashboard (runs-fr)" issue exists and lists dependencies from all four ecosystems (gomod, npm, dockerfile, github-actions); at least one Renovate PR has opened and its CI ran the `govulncheck` job.
+why: One week after merge (2026-11-15 -> 2026-11-22) Renovate has done nothing: no "Dependency Dashboard (runs-fr)" issue and no Renovate PRs on runs-fr. derio-net/frank shows no Renovate PRs or dashboard issue on GitHub either, so the spec premise that the org has the Renovate GitHub app installed looks false, or it is repo-selected without runs-fr. Operator: install or enable the Renovate app for derio-net/runs-fr, then re-check the dashboard (all four ecosystems) and a first Renovate PR running govulncheck.
+how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-4 --state fixed --note "<evidence>"
+owed_key: spec:2026-11-15-runs-fr-deps-gate#step4
