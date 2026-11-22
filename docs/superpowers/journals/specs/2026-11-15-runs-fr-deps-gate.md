@@ -177,3 +177,10 @@ run_kind: none
 
 <!-- fr:journal kind=decision scope=spec id=tier-2026-11-15-runs-fr-deps-gate-p1 created=2026-11-15T07:11:45+00:00 -->
 ### tier-2026-11-15-runs-fr-deps-gate-p1 · decision · hard: phase 1 adds a CI gate every future PR relies on and ladders client-go across five minors under the exec/remotecommand path, where API drift needs judgement
+
+<!-- fr:journal kind=discovery scope=spec id=test-plan-step-3 created=2026-11-22T21:39:48+00:00 -->
+### test-plan-step-3 · discovery · Test Plan step 3: ran
+
+Step: Run the `ci` workflow on `main` via `workflow_dispatch` and confirm the `govulncheck` job ran and passed; within a week of merge, confirm a `schedule`-triggered `ci` run on `main` ran the `govulncheck` job.
+
+Evidence: workflow_dispatch ci run 45072971977 on main@5f09aa5 (2026-11-22): go, image, helm, govulncheck all success (govulncheck-issue skipped, as designed on a clean scan). schedule-triggered ci run 43882873705 on main@5f09aa5 (2026-11-16, Monday cron) ran govulncheck: success. Gitea mirror ci run 50 govulncheck: success.
