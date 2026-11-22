@@ -177,3 +177,34 @@ run_kind: none
 
 <!-- fr:journal kind=decision scope=spec id=tier-2026-11-15-runs-fr-deps-gate-p1 created=2026-11-15T07:11:45+00:00 -->
 ### tier-2026-11-15-runs-fr-deps-gate-p1 · decision · hard: phase 1 adds a CI gate every future PR relies on and ladders client-go across five minors under the exec/remotecommand path, where API drift needs judgement
+
+<!-- fr:journal kind=discovery scope=spec id=test-plan-step-3 created=2026-11-22T21:39:48+00:00 -->
+### test-plan-step-3 · discovery · Test Plan step 3: ran
+
+Step: Run the `ci` workflow on `main` via `workflow_dispatch` and confirm the `govulncheck` job ran and passed; within a week of merge, confirm a `schedule`-triggered `ci` run on `main` ran the `govulncheck` job.
+
+Evidence: workflow_dispatch ci run 45072971977 on main@5f09aa5 (2026-11-22): go, image, helm, govulncheck all success (govulncheck-issue skipped, as designed on a clean scan). schedule-triggered ci run 43882873705 on main@5f09aa5 (2026-11-16, Monday cron) ran govulncheck: success. Gitea mirror ci run 50 govulncheck: success.
+
+<!-- fr:journal kind=owed scope=spec id=test-plan-step-1 created=2026-11-22T21:40:01+00:00 -->
+### test-plan-step-1 · owed · Test Plan step 1 owed
+
+what: Frank's staging-gate e2e (`ghcr.io/derio-net/runs-fr-smoke`) passes for the merged sha (build.yml `trigger-gate` notified, Tekton run green).
+why: Notify half verified: build.yml trigger-gate succeeded for main@5f09aa5 on GitHub (run 43700109816) and on the Gitea mirror (run 47), smoke-image built. The Tekton staging-gate run result is not visible from this host (no kube context, no status posted back to the commit) — an operator with Frank cluster access must confirm the Tekton run for 5f09aa5 is green.
+how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-1 --state fixed --note "<evidence>"
+owed_key: spec:2026-11-15-runs-fr-deps-gate#step1
+
+<!-- fr:journal kind=owed scope=spec id=test-plan-step-2 created=2026-11-22T21:40:03+00:00 -->
+### test-plan-step-2 · owed · Test Plan step 2 owed
+
+what: Attach to a pod through the deployed gateway: an interactive shell opens, typed input echoes, a terminal resize takes effect, and exit closes the session cleanly.
+why: Needs an interactive browser session through the deployed gateway (shell opens, input echoes, resize, clean exit) — operator-driven by the Test Plan; not exercisable from this agent session.
+how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-2 --state fixed --note "<evidence>"
+owed_key: spec:2026-11-15-runs-fr-deps-gate#step2
+
+<!-- fr:journal kind=owed scope=spec id=test-plan-step-4 created=2026-11-22T21:40:06+00:00 -->
+### test-plan-step-4 · owed · Test Plan step 4 owed
+
+what: Within a week of merge: the "Dependency Dashboard (runs-fr)" issue exists and lists dependencies from all four ecosystems (gomod, npm, dockerfile, github-actions); at least one Renovate PR has opened and its CI ran the `govulncheck` job.
+why: One week after merge (2026-11-15 -> 2026-11-22) Renovate has done nothing: no "Dependency Dashboard (runs-fr)" issue and no Renovate PRs on runs-fr. derio-net/frank shows no Renovate PRs or dashboard issue on GitHub either, so the spec premise that the org has the Renovate GitHub app installed looks false, or it is repo-selected without runs-fr. Operator: install or enable the Renovate app for derio-net/runs-fr, then re-check the dashboard (all four ecosystems) and a first Renovate PR running govulncheck.
+how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-4 --state fixed --note "<evidence>"
+owed_key: spec:2026-11-15-runs-fr-deps-gate#step4
