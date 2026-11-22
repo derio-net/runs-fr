@@ -192,3 +192,11 @@ what: Frank's staging-gate e2e (`ghcr.io/derio-net/runs-fr-smoke`) passes for th
 why: Notify half verified: build.yml trigger-gate succeeded for main@5f09aa5 on GitHub (run 43700109816) and on the Gitea mirror (run 47), smoke-image built. The Tekton staging-gate run result is not visible from this host (no kube context, no status posted back to the commit) — an operator with Frank cluster access must confirm the Tekton run for 5f09aa5 is green.
 how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-1 --state fixed --note "<evidence>"
 owed_key: spec:2026-11-15-runs-fr-deps-gate#step1
+
+<!-- fr:journal kind=owed scope=spec id=test-plan-step-2 created=2026-11-22T21:40:03+00:00 -->
+### test-plan-step-2 · owed · Test Plan step 2 owed
+
+what: Attach to a pod through the deployed gateway: an interactive shell opens, typed input echoes, a terminal resize takes effect, and exit closes the session cleanly.
+why: Needs an interactive browser session through the deployed gateway (shell opens, input echoes, resize, clean exit) — operator-driven by the Test Plan; not exercisable from this agent session.
+how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-2 --state fixed --note "<evidence>"
+owed_key: spec:2026-11-15-runs-fr-deps-gate#step2
