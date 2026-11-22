@@ -184,3 +184,11 @@ run_kind: none
 Step: Run the `ci` workflow on `main` via `workflow_dispatch` and confirm the `govulncheck` job ran and passed; within a week of merge, confirm a `schedule`-triggered `ci` run on `main` ran the `govulncheck` job.
 
 Evidence: workflow_dispatch ci run 45072971977 on main@5f09aa5 (2026-11-22): go, image, helm, govulncheck all success (govulncheck-issue skipped, as designed on a clean scan). schedule-triggered ci run 43882873705 on main@5f09aa5 (2026-11-16, Monday cron) ran govulncheck: success. Gitea mirror ci run 50 govulncheck: success.
+
+<!-- fr:journal kind=owed scope=spec id=test-plan-step-1 created=2026-11-22T21:40:01+00:00 -->
+### test-plan-step-1 · owed · Test Plan step 1 owed
+
+what: Frank's staging-gate e2e (`ghcr.io/derio-net/runs-fr-smoke`) passes for the merged sha (build.yml `trigger-gate` notified, Tekton run green).
+why: Notify half verified: build.yml trigger-gate succeeded for main@5f09aa5 on GitHub (run 43700109816) and on the Gitea mirror (run 47), smoke-image built. The Tekton staging-gate run result is not visible from this host (no kube context, no status posted back to the commit) — an operator with Frank cluster access must confirm the Tekton run for 5f09aa5 is green.
+how: fr journal resolve --scope spec --slug 2026-11-15-runs-fr-deps-gate --id test-plan-step-1 --state fixed --note "<evidence>"
+owed_key: spec:2026-11-15-runs-fr-deps-gate#step1
